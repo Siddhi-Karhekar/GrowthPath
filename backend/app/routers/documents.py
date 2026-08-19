@@ -1,0 +1,114 @@
+import uuid
+from datetime import datetime, timezone
+from typing import Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, UploadFile
+
+from app.core.security import get_current_user_id
+from app.core.supabase_client import get_supabase
+from app.models.schemas import DocumentOut
+from app.services.document_service import ingest_document, reingest_document
+
+router = APIRouter()
+
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20MB - generous for lecture notes/PDFs, keeps free-tier storage in check
+DOCUMENT_COLUMNS = "id, filename, status, page_count, subject_id, version, created_at, updated_at"
+
+
+@router.post("", response_model=DocumentOut)
+async def upload_document(
+    file: UploadFile,
+    background_tasks: BackgroundTasks,
+    subject_id: Optional[str] = Form(default=None),
+    user_id: str = Depends(get_current_user_id),
+):
+    file_bytes = await file.read()
+    if len(file_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "File too large (max 20MB on the free tier).")
+
+    # Ingestion (parsing/OCR/embedding) can take a few seconds - generate the
+    # id up front so we can return it immediately, then do the actual work
+    # (upload/parse/embed) in the background. The frontend polls
+    # GET /api/documents/{id} for status until it flips to "ready"/"failed".
+    document_id = str(uuid.uuid4())
+    background_tasks.add_task(_ingest_and_record, user_id, file.filename, file_bytes, document_id, subject_id)
+
+    return DocumentOut(
+        id=document_id, filename=file.filename, status="processing", page_count=None,
+        subject_id=subject_id, version=1, created_at=_now(),
+    )
+
+
+def _ingest_and_record(
+    user_id: str, filename: str, file_bytes: bytes, document_id: str, subject_id: Optional[str]
+) -> None:
+    # A production version would use a task queue (Celery/Redis) and push a
+    # websocket/event on completion; polling is simpler and free-tier-friendly
+    # for an MVP.
+    try:
+        ingest_document(user_id, filename, file_bytes, document_id=document_id, subject_id=subject_id)
+    except Exception as exc:  # noqa: BLE001 - log and move on, status already recorded as "failed"
+        print(f"[document ingestion failed] user={user_id} file={filename}: {exc}")
+
+
+def _now():
+    return datetime.now(timezone.utc)
+
+
+@router.put("/{document_id}/reupload", response_model=DocumentOut)
+async def reupload_document(
+    document_id: str,
+    file: UploadFile,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Replace a document's content with an updated version - test/attempt
+    history for this document_id is preserved, only the source material and
+    its derived chunks/embeddings are refreshed."""
+    supabase = get_supabase()
+    existing = (
+        supabase.table("documents").select("id").eq("id", document_id).eq("user_id", user_id).single().execute()
+    )
+    if not existing.data:
+        raise HTTPException(404, "Document not found")
+
+    file_bytes = await file.read()
+    if len(file_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "File too large (max 20MB on the free tier).")
+
+    background_tasks.add_task(_reingest_and_record, user_id, document_id, file.filename, file_bytes)
+
+    return get_document(document_id, user_id)
+
+
+def _reingest_and_record(user_id: str, document_id: str, filename: str, file_bytes: bytes) -> None:
+    try:
+        reingest_document(user_id, document_id, filename, file_bytes)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[document reingestion failed] user={user_id} document={document_id}: {exc}")
+
+
+@router.get("", response_model=list[DocumentOut])
+def list_documents(subject_id: Optional[str] = None, user_id: str = Depends(get_current_user_id)):
+    supabase = get_supabase()
+    query = supabase.table("documents").select(DOCUMENT_COLUMNS).eq("user_id", user_id)
+    if subject_id is not None:
+        query = query.eq("subject_id", subject_id)
+    res = query.order("created_at", desc=True).execute()
+    return res.data
+
+
+@router.get("/{document_id}", response_model=DocumentOut)
+def get_document(document_id: str, user_id: str = Depends(get_current_user_id)):
+    supabase = get_supabase()
+    res = (
+        supabase.table("documents")
+        .select(DOCUMENT_COLUMNS)
+        .eq("id", document_id)
+        .eq("user_id", user_id)
+        .single()
+        .execute()
+    )
+    if not res.data:
+        raise HTTPException(404, "Document not found")
+    return res.data

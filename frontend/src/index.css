@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light dark;
+}
+
+/* Bumping the root size scales every Tailwind rem-based utility (padding,
+   text, gaps) up uniformly - the cleanest way to make the whole app read
+   like a comfortable desktop app instead of a cramped mobile-first layout. */
+html {
+  font-size: 17px;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(180deg, #f0fdfa 0%, #f0f9ff 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: linear-gradient(180deg, #0a1f1c 0%, #0b1524 100%);
+  }
+}
+
+/* A calm, consistent "smooth transition" feel across the app - scoped to
+   the properties that actually change on hover/focus/state, not layout
+   properties, so nothing feels janky. */
+button,
+a,
+input,
+select,
+textarea,
+[class*="transition"] {
+  transition-property: background-color, border-color, color, box-shadow, transform, opacity;
+  transition-timing-function: ease;
+  transition-duration: 180ms;
+}
+
+::selection {
+  background: #99f6e4;
+  color: #134e4a;
+}
