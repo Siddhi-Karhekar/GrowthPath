@@ -2,14 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.routers import documents, tests, attempts, analytics, subjects, study_guides
+from app.routers import analytics, attempts, concepts, documents, notes, study_guides, subjects, tests
 
 settings = get_settings()
 
 app = FastAPI(
     title="GrowthPath API",
     description="Personal study-growth platform: upload material, generate "
-                 "tests, track your own progress over time.",
+                 "tests, build a knowledge graph, and track your own progress over time.",
     version="0.1.0",
 )
 
@@ -27,6 +27,8 @@ app.include_router(attempts.router, prefix="/api/attempts", tags=["attempts"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(subjects.router, prefix="/api/subjects", tags=["subjects"])
 app.include_router(study_guides.router, prefix="/api/study-guides", tags=["study-guides"])
+app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
+app.include_router(concepts.router, prefix="/api/concepts", tags=["concepts"])
 
 
 @app.get("/api/health")

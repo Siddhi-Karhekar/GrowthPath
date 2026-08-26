@@ -13,6 +13,9 @@ export interface DocumentOut {
   page_count: number | null;
   subject_id: string | null;
   version: number;
+  document_type: "textbook" | "notes";
+  source_type: "upload" | "link";
+  source_url: string | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -111,4 +114,52 @@ export interface StudyGuideOut {
   document_id: string;
   topics: StudyGuideTopic[];
   created_at: string;
+}
+
+// ---------- Notes ----------
+
+export interface NoteOut {
+  id: string;
+  document_id: string | null;
+  title: string;
+  content: string;
+  generated: boolean;
+  created_at: string | null;
+}
+
+// ---------- Knowledge graph ----------
+
+export type RelationType = "prerequisite" | "related" | "part_of" | "contrasts_with";
+
+export interface ConceptOut {
+  id: string;
+  canonical_name: string;
+  description: string | null;
+  mastery: number | null;
+}
+
+export interface ConceptEdgeOut {
+  id: string;
+  source_concept_id: string;
+  target_concept_id: string;
+  relation_type: RelationType;
+  weight: number;
+  rationale: string | null;
+}
+
+export interface ConceptGraphOut {
+  subject_id: string;
+  concepts: ConceptOut[];
+  edges: ConceptEdgeOut[];
+}
+
+export interface ConceptCandidateOut {
+  id: string;
+  new_alias: string;
+  candidate_concept_id: string;
+  candidate_concept_name: string;
+  embedding_similarity: number;
+  llm_verdict: string | null;
+  llm_rationale: string | null;
+  status: string;
 }

@@ -1,0 +1,61 @@
+# Render Blueprint - deploys both the backend (Docker web service) and the
+# frontend (static site) from this one repo with "New -> Blueprint" in the
+# Render dashboard, so everything lives on one platform/account.
+#
+# Two-step env var setup because the frontend needs the backend's URL (and
+# vice versa for CORS), and Render only assigns those URLs once a service
+# has been created - so on the FIRST deploy, the sync:false vars below are
+# skipped/left blank; after that first deploy, copy each service's actual
+# https://...onrender.com URL from its dashboard page into the other
+# service's env vars (VITE_API_BASE_URL on the frontend, CORS_ORIGINS on
+# the backend), then trigger a manual redeploy of both. After that, this
+# file doesn't need touching again for routine deploys.
+services:
+  - type: web
+    name: growthpath-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: EMBEDDING_MODEL_NAME
+        value: sentence-transformers/all-MiniLM-L6-v2
+      - key: DOCUMENTS_BUCKET
+        value: documents
+      - key: ENVIRONMENT
+        value: production
+      - key: CORS_ORIGINS
+        sync: false
+        # After the frontend service below has deployed once, set this to
+        # its URL, e.g. https://growthpath-frontend.onrender.com
+
+  - type: web
+    name: growthpath-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_API_BASE_URL
+        sync: false
+        # Set this to the backend service's URL once it has deployed once,
+        # e.g. https://growthpath-backend.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

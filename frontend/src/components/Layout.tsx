@@ -26,13 +26,27 @@ const GrowthIcon = () => (
   </svg>
 );
 
+const GraphIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="6" cy="6" r="2.3" stroke="currentColor" strokeWidth="1.7" />
+    <circle cx="18" cy="7" r="2.3" stroke="currentColor" strokeWidth="1.7" />
+    <circle cx="9" cy="18" r="2.3" stroke="currentColor" strokeWidth="1.7" />
+    <circle cx="17" cy="16" r="2.3" stroke="currentColor" strokeWidth="1.7" />
+    <path d="M8 7.2L16 7" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M7.2 8L15 15" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2.5 2.5" />
+    <path d="M10.5 17L15.5 16.5" stroke="currentColor" strokeWidth="1.5" />
+  </svg>
+);
+
 const links = [
   { to: "/", label: "My Documents", icon: DocumentsIcon },
+  { to: "/knowledge-graph", label: "Knowledge Graph", icon: GraphIcon },
   { to: "/progress", label: "My Growth", icon: GrowthIcon },
 ];
 
 const pageTitles: Record<string, string> = {
   "/": "My Documents",
+  "/knowledge-graph": "Knowledge Graph",
   "/progress": "My Growth",
   "/tests/new": "Create a test",
 };
@@ -49,7 +63,9 @@ export default function Layout() {
         ? "Results"
         : location.pathname.includes("/study-guide")
           ? "Study guide"
-          : "GrowthPath");
+          : location.pathname.includes("/notes")
+            ? "Notes"
+            : "GrowthPath");
 
   return (
     <div className="min-h-screen flex">

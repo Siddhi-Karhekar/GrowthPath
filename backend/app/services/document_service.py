@@ -1,11 +1,16 @@
 """
 Orchestrates the full document ingestion pipeline:
-upload -> parse (+ OCR fallback) -> chunk -> embed -> cluster into topics ->
-label topics via LLM -> persist chunks+embeddings to Supabase/pgvector.
+upload/link -> parse (+ OCR fallback) -> chunk -> embed -> cluster into
+topics -> label topics via LLM -> persist chunks+embeddings to
+Supabase/pgvector.
 
 Also handles re-ingestion when a student replaces a document with an updated
 version - old chunks/embeddings are cleared and rebuilt from the new file,
 but the document's id (and therefore its test/attempt history) stays intact.
+
+Two intake paths converge on the same _process_document() once raw text has
+been obtained: an uploaded file (ingest_document) and a textbook link
+(ingest_document_from_link).
 """
 import uuid
 from collections import defaultdict
@@ -14,7 +19,13 @@ from datetime import datetime, timezone
 from app.core.config import get_settings
 from app.core.supabase_client import get_supabase
 from app.ml.clustering import cluster_embeddings
-from app.services.document_parser import chunk_text, parse_document
+from app.services.document_parser import (
+    chunk_text,
+    fetch_url,
+    filename_from_url,
+    parse_document,
+    parse_url_content,
+)
 from app.services.embedding_service import embed_texts
 from app.services.topic_labeling import label_clusters
 
@@ -25,6 +36,7 @@ def ingest_document(
     file_bytes: bytes,
     document_id: str | None = None,
     subject_id: str | None = None,
+    document_type: str = "textbook",
 ) -> str:
     settings = get_settings()
     supabase = get_supabase()
@@ -45,11 +57,61 @@ def ingest_document(
             "storage_path": storage_path,
             "status": "processing",
             "subject_id": subject_id,
+            "document_type": document_type,
+            "source_type": "upload",
         }
     ).execute()
 
     try:
-        _process_document(user_id, document_id, filename, file_bytes)
+        full_text, page_count = parse_document(file_bytes, filename)
+        _process_document(user_id, document_id, full_text, page_count)
+        supabase.table("documents").update({"status": "ready"}).eq("id", document_id).execute()
+    except Exception:
+        supabase.table("documents").update({"status": "failed"}).eq("id", document_id).execute()
+        raise
+
+    return document_id
+
+
+def ingest_document_from_link(
+    user_id: str,
+    url: str,
+    document_id: str | None = None,
+    subject_id: str | None = None,
+    document_type: str = "textbook",
+) -> str:
+    """Same pipeline as ingest_document, but the source material is fetched
+    from a URL (a direct textbook PDF link, or a webpage) instead of an
+    uploaded file. The fetched bytes are still stored in Supabase Storage so
+    reprocessing/re-download never needs to hit the original URL again."""
+    settings = get_settings()
+    supabase = get_supabase()
+
+    document_id = document_id or str(uuid.uuid4())
+    filename = filename_from_url(url)
+    storage_path = f"{user_id}/{document_id}_{filename}"
+
+    supabase.table("documents").insert(
+        {
+            "id": document_id,
+            "user_id": user_id,
+            "filename": filename,
+            "storage_path": storage_path,
+            "status": "processing",
+            "subject_id": subject_id,
+            "document_type": document_type,
+            "source_type": "link",
+            "source_url": url,
+        }
+    ).execute()
+
+    try:
+        content, content_type = fetch_url(url)
+        supabase.storage.from_(settings.documents_bucket).upload(
+            storage_path, content, {"content-type": content_type or "application/octet-stream"}
+        )
+        full_text, page_count = parse_url_content(content, content_type, url)
+        _process_document(user_id, document_id, full_text, page_count)
         supabase.table("documents").update({"status": "ready"}).eq("id", document_id).execute()
     except Exception:
         supabase.table("documents").update({"status": "failed"}).eq("id", document_id).execute()
@@ -93,40 +155,39 @@ def reingest_document(user_id: str, document_id: str, filename: str, file_bytes:
 
     # Old chunks/embeddings no longer reflect the current file - clear them
     # before reprocessing so stale content can't leak into future test
-    # generation or study guides for this document.
+    # generation, study guides, or notes for this document.
     supabase.table("document_chunks").delete().eq("document_id", document_id).execute()
 
     try:
-        _process_document(user_id, document_id, filename, file_bytes)
+        full_text, page_count = parse_document(file_bytes, filename)
+        _process_document(user_id, document_id, full_text, page_count)
         supabase.table("documents").update({"status": "ready"}).eq("id", document_id).execute()
     except Exception:
         supabase.table("documents").update({"status": "failed"}).eq("id", document_id).execute()
         raise
 
 
-def _process_document(user_id: str, document_id: str, filename: str, file_bytes: bytes) -> None:
+def _process_document(user_id: str, document_id: str, full_text: str, page_count: int) -> None:
     supabase = get_supabase()
 
-    # 2. Parse text (with OCR fallback for scanned pages).
-    full_text, page_count = parse_document(file_bytes, filename)
     supabase.table("documents").update({"page_count": page_count}).eq("id", document_id).execute()
 
-    # 3. Chunk for RAG grounding.
+    # Chunk for RAG grounding.
     chunks = chunk_text(full_text)
     if not chunks:
         raise ValueError("No extractable text found in document.")
 
-    # 4. Embed all chunks locally (free, no API cost).
+    # Embed all chunks locally (free, no API cost).
     embeddings = embed_texts(chunks)
 
-    # 5. Cluster chunks into topics, then label each cluster once via LLM.
+    # Cluster chunks into topics, then label each cluster once via LLM.
     cluster_labels = cluster_embeddings(embeddings)
     samples_by_cluster: dict[int, list[str]] = defaultdict(list)
     for chunk, cluster_id in zip(chunks, cluster_labels):
         samples_by_cluster[cluster_id].append(chunk)
     topic_names = label_clusters(samples_by_cluster)
 
-    # 6. Persist chunks + embeddings + topic assignment.
+    # Persist chunks + embeddings + topic assignment.
     rows = []
     for idx, (chunk, cluster_id, embedding) in enumerate(zip(chunks, cluster_labels, embeddings)):
         rows.append(

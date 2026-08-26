@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -16,6 +19,24 @@ const severityColor: Record<string, string> = {
   medium: "border-amber-300 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400",
   low: "border-slate-200 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400",
 };
+
+// Same 0.45 / 0.7 thresholds the backend uses for risk flags (analytics_service.py),
+// so this chart's colors agree with what "Needs attention" means elsewhere on the page.
+function masteryBarColor(masteryPct: number): string {
+  if (masteryPct < 45) return "#fb7185"; // rose-400
+  if (masteryPct < 70) return "#fbbf24"; // amber-400
+  return "#2dd4bf"; // teal-400
+}
+
+function isoWeekLabel(dateStr: string): { key: string; label: string } {
+  const d = new Date(dateStr);
+  const monday = new Date(d);
+  const day = (d.getDay() + 6) % 7; // 0 = Monday
+  monday.setDate(d.getDate() - day);
+  const key = monday.toISOString().slice(0, 10);
+  const label = monday.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return { key, label };
+}
 
 export default function ProgressPage() {
   const [summary, setSummary] = useState<ProgressSummaryOut | null>(null);
@@ -39,6 +60,22 @@ export default function ProgressPage() {
     date: new Date(h.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
     percentage: h.percentage,
   }));
+
+  const masteryChartData = [...summary.topic_mastery]
+    .sort((a, b) => a.mastery - b.mastery)
+    .map((t) => ({ topic: t.topic, masteryPct: Math.round(t.mastery * 100) }));
+
+  // Study activity: how many tests were taken per week - a lightweight,
+  // already-collected proxy for study consistency, without needing a
+  // separate behavioral-tracking pipeline.
+  const activityBuckets = new Map<string, { label: string; count: number }>();
+  for (const h of summary.history) {
+    const { key, label } = isoWeekLabel(h.date);
+    const existing = activityBuckets.get(key);
+    if (existing) existing.count += 1;
+    else activityBuckets.set(key, { label, count: 1 });
+  }
+  const activityData = [...activityBuckets.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v);
 
   return (
     <div className="space-y-8">
@@ -87,6 +124,21 @@ export default function ProgressPage() {
             </ResponsiveContainer>
           </div>
 
+          {activityData.length > 1 && (
+            <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-5 shadow-sm shadow-teal-500/5">
+              <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Study activity (tests per week)</h2>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={activityData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+                  <XAxis dataKey="label" fontSize={12} />
+                  <YAxis allowDecimals={false} fontSize={12} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
           {summary.risk_flags.length > 0 && (
             <div>
               <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Needs attention</h2>
@@ -100,25 +152,24 @@ export default function ProgressPage() {
             </div>
           )}
 
-          <div>
-            <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Topic mastery</h2>
-            <div className="space-y-2">
-              {summary.topic_mastery.map((t) => (
-                <div key={t.topic} className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-xl px-4 py-3 shadow-sm shadow-teal-500/5">
-                  <div className="flex justify-between text-sm mb-1.5">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">{t.topic}</span>
-                    <span className="text-slate-500">{Math.round(t.mastery * 100)}%</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-teal-400 to-sky-500 rounded-full"
-                      style={{ width: `${Math.round(t.mastery * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+          {masteryChartData.length > 0 && (
+            <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-5 shadow-sm shadow-teal-500/5">
+              <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Mastery by topic</h2>
+              <ResponsiveContainer width="100%" height={Math.max(160, masteryChartData.length * 34)}>
+                <BarChart data={masteryChartData} layout="vertical" margin={{ left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-slate-200 dark:stroke-slate-800" />
+                  <XAxis type="number" domain={[0, 100]} fontSize={12} />
+                  <YAxis type="category" dataKey="topic" width={140} fontSize={12} />
+                  <Tooltip formatter={(value) => [`${value}%`, "Mastery"]} />
+                  <Bar dataKey="masteryPct" radius={[0, 4, 4, 0]}>
+                    {masteryChartData.map((entry, i) => (
+                      <Cell key={i} fill={masteryBarColor(entry.masteryPct)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          </div>
+          )}
 
           {summary.revision_reminders.length > 0 && (
             <div>

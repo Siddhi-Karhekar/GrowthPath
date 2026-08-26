@@ -1,8 +1,8 @@
 """
 Pydantic request/response models shared across routers. These mirror the
-Postgres tables defined in docs/schema.sql but are intentionally kept
-separate from the DB layer (services/*.py) so the API contract doesn't
-silently change if we tweak a column.
+Postgres tables defined in docs/schema.sql (+ migration_001, migration_002)
+but are intentionally kept separate from the DB layer (services/*.py) so
+the API contract doesn't silently change if we tweak a column.
 """
 from __future__ import annotations
 
@@ -34,8 +34,17 @@ class DocumentOut(BaseModel):
     page_count: Optional[int] = None
     subject_id: Optional[str] = None
     version: int = 1
+    document_type: str = "textbook"  # "textbook" | "notes"
+    source_type: str = "upload"  # "upload" | "link"
+    source_url: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+
+class LinkIngestRequest(BaseModel):
+    url: str = Field(min_length=1)
+    subject_id: Optional[str] = None
+    document_type: str = "textbook"
 
 
 # ---------- Test generation preferences ----------
@@ -183,3 +192,67 @@ class StudyGuideOut(BaseModel):
 
 class StudyGuideGenerateRequest(BaseModel):
     document_id: str
+
+
+# ---------- Notes (uploaded/generated, or written freehand) ----------
+
+class NoteGenerateRequest(BaseModel):
+    document_id: str
+
+
+class NoteCreateRequest(BaseModel):
+    subject_id: Optional[str] = None
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1)
+
+
+class NoteOut(BaseModel):
+    id: str
+    document_id: Optional[str] = None  # null for a freehand note not derived from any document
+    title: str
+    content: str  # markdown
+    generated: bool
+    created_at: Optional[datetime] = None
+
+
+# ---------- Knowledge graph ----------
+
+class ConceptGraphBuildRequest(BaseModel):
+    subject_id: str
+
+
+class ConceptOut(BaseModel):
+    id: str
+    canonical_name: str
+    description: Optional[str] = None
+    mastery: Optional[float] = None  # 0-1, joined from topic_mastery by name/alias match; null if never tested
+
+
+class ConceptEdgeOut(BaseModel):
+    id: str
+    source_concept_id: str
+    target_concept_id: str
+    relation_type: str  # "prerequisite" | "related" | "part_of" | "contrasts_with"
+    weight: float
+    rationale: Optional[str] = None
+
+
+class ConceptGraphOut(BaseModel):
+    subject_id: str
+    concepts: list[ConceptOut]
+    edges: list[ConceptEdgeOut]
+
+
+class ConceptCandidateOut(BaseModel):
+    id: str
+    new_alias: str
+    candidate_concept_id: str
+    candidate_concept_name: str
+    embedding_similarity: float
+    llm_verdict: Optional[str] = None
+    llm_rationale: Optional[str] = None
+    status: str
+
+
+class ConceptCandidateResolveRequest(BaseModel):
+    resolution: str  # "confirm_same" | "reject_as_different"

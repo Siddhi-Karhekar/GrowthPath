@@ -6,13 +6,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Up
 
 from app.core.security import get_current_user_id
 from app.core.supabase_client import get_supabase
-from app.models.schemas import DocumentOut
-from app.services.document_service import ingest_document, reingest_document
+from app.models.schemas import DocumentOut, LinkIngestRequest
+from app.services.document_service import ingest_document, ingest_document_from_link, reingest_document
 
 router = APIRouter()
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20MB - generous for lecture notes/PDFs, keeps free-tier storage in check
-DOCUMENT_COLUMNS = "id, filename, status, page_count, subject_id, version, created_at, updated_at"
+DOCUMENT_COLUMNS = "id, filename, status, page_count, subject_id, version, document_type, source_type, source_url, created_at, updated_at"
 
 
 @router.post("", response_model=DocumentOut)
@@ -20,6 +20,7 @@ async def upload_document(
     file: UploadFile,
     background_tasks: BackgroundTasks,
     subject_id: Optional[str] = Form(default=None),
+    document_type: str = Form(default="textbook"),
     user_id: str = Depends(get_current_user_id),
 ):
     file_bytes = await file.read()
@@ -31,24 +32,60 @@ async def upload_document(
     # (upload/parse/embed) in the background. The frontend polls
     # GET /api/documents/{id} for status until it flips to "ready"/"failed".
     document_id = str(uuid.uuid4())
-    background_tasks.add_task(_ingest_and_record, user_id, file.filename, file_bytes, document_id, subject_id)
+    background_tasks.add_task(
+        _ingest_and_record, user_id, file.filename, file_bytes, document_id, subject_id, document_type
+    )
 
     return DocumentOut(
         id=document_id, filename=file.filename, status="processing", page_count=None,
-        subject_id=subject_id, version=1, created_at=_now(),
+        subject_id=subject_id, version=1, document_type=document_type, source_type="upload",
+        source_url=None, created_at=_now(),
     )
 
 
 def _ingest_and_record(
-    user_id: str, filename: str, file_bytes: bytes, document_id: str, subject_id: Optional[str]
+    user_id: str, filename: str, file_bytes: bytes, document_id: str, subject_id: Optional[str], document_type: str
 ) -> None:
     # A production version would use a task queue (Celery/Redis) and push a
     # websocket/event on completion; polling is simpler and free-tier-friendly
     # for an MVP.
     try:
-        ingest_document(user_id, filename, file_bytes, document_id=document_id, subject_id=subject_id)
+        ingest_document(user_id, filename, file_bytes, document_id=document_id, subject_id=subject_id, document_type=document_type)
     except Exception as exc:  # noqa: BLE001 - log and move on, status already recorded as "failed"
         print(f"[document ingestion failed] user={user_id} file={filename}: {exc}")
+
+
+@router.post("/from-link", response_model=DocumentOut)
+async def upload_from_link(
+    req: LinkIngestRequest,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Ingests a textbook from a link instead of an uploaded file - a direct
+    PDF link is parsed like an upload; any other URL is treated as a webpage
+    and its readable text is extracted. Same downstream pipeline either way
+    (chunk -> embed -> cluster into topics -> label), so tests, study
+    guides, notes, and the knowledge graph all work identically regardless
+    of how the material arrived."""
+    document_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        _ingest_link_and_record, user_id, req.url, document_id, req.subject_id, req.document_type
+    )
+
+    return DocumentOut(
+        id=document_id, filename=req.url, status="processing", page_count=None,
+        subject_id=req.subject_id, version=1, document_type=req.document_type, source_type="link",
+        source_url=req.url, created_at=_now(),
+    )
+
+
+def _ingest_link_and_record(
+    user_id: str, url: str, document_id: str, subject_id: Optional[str], document_type: str
+) -> None:
+    try:
+        ingest_document_from_link(user_id, url, document_id=document_id, subject_id=subject_id, document_type=document_type)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[link ingestion failed] user={user_id} url={url}: {exc}")
 
 
 def _now():

@@ -1,7 +1,10 @@
 import { supabase } from "./supabase";
 import type {
   AttemptResultOut,
+  ConceptCandidateOut,
+  ConceptGraphOut,
   DocumentOut,
+  NoteOut,
   ProgressSummaryOut,
   QuestionOut,
   StudyGuideOut,
@@ -35,12 +38,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  uploadDocument: (file: File, subjectId?: string | null) => {
+  uploadDocument: (file: File, subjectId?: string | null, documentType: "textbook" | "notes" = "textbook") => {
     const form = new FormData();
     form.append("file", file);
     if (subjectId) form.append("subject_id", subjectId);
+    form.append("document_type", documentType);
     return request<DocumentOut>("/api/documents", { method: "POST", body: form });
   },
+
+  uploadDocumentFromLink: (url: string, subjectId?: string | null, documentType: "textbook" | "notes" = "textbook") =>
+    request<DocumentOut>("/api/documents/from-link", {
+      method: "POST",
+      body: JSON.stringify({ url, subject_id: subjectId ?? null, document_type: documentType }),
+    }),
 
   reuploadDocument: (documentId: string, file: File) => {
     const form = new FormData();
@@ -117,4 +127,35 @@ export const api = {
 
   getLatestStudyGuide: (documentId: string) =>
     request<StudyGuideOut | null>(`/api/study-guides/by-document/${documentId}`),
+
+  // ---------- Notes ----------
+
+  generateNotes: (documentId: string) =>
+    request<NoteOut>("/api/notes/generate", { method: "POST", body: JSON.stringify({ document_id: documentId }) }),
+
+  getLatestNotes: (documentId: string) => request<NoteOut | null>(`/api/notes/by-document/${documentId}`),
+
+  createNote: (subjectId: string | null, title: string, content: string) =>
+    request<NoteOut>("/api/notes", {
+      method: "POST",
+      body: JSON.stringify({ subject_id: subjectId, title, content }),
+    }),
+
+  listNotes: (subjectId?: string | null) =>
+    request<NoteOut[]>(`/api/notes${subjectId ? `?subject_id=${subjectId}` : ""}`),
+
+  // ---------- Knowledge graph ----------
+
+  buildConceptGraph: (subjectId: string) =>
+    request<ConceptGraphOut>("/api/concepts/build", { method: "POST", body: JSON.stringify({ subject_id: subjectId }) }),
+
+  getConceptGraph: (subjectId: string) => request<ConceptGraphOut>(`/api/concepts/graph/${subjectId}`),
+
+  listConceptCandidates: (subjectId: string) => request<ConceptCandidateOut[]>(`/api/concepts/candidates/${subjectId}`),
+
+  resolveConceptCandidate: (candidateId: string, resolution: "confirm_same" | "reject_as_different") =>
+    request<void>(`/api/concepts/candidates/${candidateId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ resolution }),
+    }),
 };

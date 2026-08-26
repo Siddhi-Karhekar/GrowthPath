@@ -8,6 +8,8 @@ import TestTakingPage from "./pages/TestTakingPage";
 import ResultsPage from "./pages/ResultsPage";
 import ProgressPage from "./pages/ProgressPage";
 import StudyGuidePage from "./pages/StudyGuidePage";
+import NotesPage from "./pages/NotesPage";
+import KnowledgeGraphPage from "./pages/KnowledgeGraphPage";
 
 export default function App() {
   return (
@@ -21,6 +23,8 @@ export default function App() {
               <Route path="/tests/:testId/take" element={<TestTakingPage />} />
               <Route path="/attempts/:attemptId/results" element={<ResultsPage />} />
               <Route path="/study-guide/:documentId" element={<StudyGuidePage />} />
+              <Route path="/notes/:documentId" element={<NotesPage />} />
+              <Route path="/knowledge-graph" element={<KnowledgeGraphPage />} />
               <Route path="/progress" element={<ProgressPage />} />
             </Route>
           </Routes>

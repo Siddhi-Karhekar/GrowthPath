@@ -13,6 +13,9 @@ export default function DocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [newSubjectName, setNewSubjectName] = useState("");
   const [showNewSubject, setShowNewSubject] = useState(false);
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkType, setLinkType] = useState<"textbook" | "notes">("textbook");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reuploadRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -57,18 +60,35 @@ export default function DocumentsPage() {
     }
   }
 
-  async function handleUpload(file: File) {
+  async function handleUpload(file: File, documentType: "textbook" | "notes" = "textbook") {
     setUploading(true);
     setError(null);
     try {
       const subjectId = activeSubject && activeSubject !== UNCATEGORIZED ? activeSubject : undefined;
-      await api.uploadDocument(file, subjectId);
+      await api.uploadDocument(file, subjectId, documentType);
       await refreshDocuments();
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleLinkSubmit() {
+    if (!linkUrl.trim()) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const subjectId = activeSubject && activeSubject !== UNCATEGORIZED ? activeSubject : undefined;
+      await api.uploadDocumentFromLink(linkUrl.trim(), subjectId, linkType);
+      setLinkUrl("");
+      setShowLinkForm(false);
+      await refreshDocuments();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -142,31 +162,71 @@ export default function DocumentsPage() {
       </aside>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">My Documents</h1>
             <p className="text-sm text-slate-500 mt-1">
-              Upload your notes or textbook chapters - GrowthPath turns them into tests and study guides.
+              Upload your notes, upload a textbook PDF, or paste a link to a textbook - GrowthPath turns any of them into tests, study guides, notes, and a knowledge graph.
             </p>
           </div>
-          <label className="cursor-pointer rounded-lg bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400 text-white text-sm font-medium px-4 py-2.5 shadow-sm shadow-teal-500/25">
-            {uploading ? "Uploading..." : "Upload document"}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.docx,.txt"
-              className="hidden"
-              disabled={uploading}
-              onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
-            />
-          </label>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowLinkForm((v) => !v)}
+              className="rounded-lg border border-teal-300 dark:border-teal-800 text-teal-700 dark:text-teal-400 text-sm font-medium px-4 py-2.5 hover:bg-teal-50 dark:hover:bg-teal-950/40"
+            >
+              Add from a link
+            </button>
+            <label className="cursor-pointer rounded-lg bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400 text-white text-sm font-medium px-4 py-2.5 shadow-sm shadow-teal-500/25">
+              {uploading ? "Uploading..." : "Upload document"}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.txt"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+              />
+            </label>
+          </div>
         </div>
+
+        {showLinkForm && (
+          <div className="mb-6 bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-4 shadow-sm shadow-teal-500/5">
+            <p className="text-xs text-slate-500 mb-2">
+              Paste a direct link to a textbook PDF, or a webpage of textbook-style material. It's parsed the same way as an upload.
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <input
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLinkSubmit()}
+                placeholder="https://example.com/textbook-chapter.pdf"
+                className="flex-1 min-w-[240px] rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              />
+              <select
+                value={linkType}
+                onChange={(e) => setLinkType(e.target.value as "textbook" | "notes")}
+                className="rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              >
+                <option value="textbook">Textbook</option>
+                <option value="notes">Notes</option>
+              </select>
+              <button
+                onClick={handleLinkSubmit}
+                disabled={uploading || !linkUrl.trim()}
+                className="rounded-lg bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400 disabled:opacity-60 text-white text-sm font-medium px-4 py-2"
+              >
+                {uploading ? "Fetching..." : "Add"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
         {documents.length === 0 ? (
           <div className="text-center py-16 text-slate-400 border border-dashed border-teal-200 dark:border-teal-900/50 rounded-2xl">
-            No documents here yet. Upload a PDF, DOCX, or TXT file to get started.
+            No documents here yet. Upload a PDF, DOCX, or TXT file, or add one from a link, to get started.
           </div>
         ) : (
           <ul className="space-y-2.5">
@@ -178,6 +238,8 @@ export default function DocumentsPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
                     {doc.filename} {doc.version > 1 && <span className="text-xs text-slate-400">v{doc.version}</span>}
+                    {doc.source_type === "link" && <span className="text-xs text-sky-500 ml-1.5">via link</span>}
+                    {doc.document_type === "notes" && <span className="text-xs text-slate-400 ml-1.5">· notes</span>}
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {doc.status === "processing" && "Processing..."}
@@ -192,6 +254,9 @@ export default function DocumentsPage() {
                     </Link>
                     <Link to={`/study-guide/${doc.id}`} className="text-sm text-teal-600 hover:text-teal-500 font-medium">
                       Study guide
+                    </Link>
+                    <Link to={`/notes/${doc.id}`} className="text-sm text-teal-600 hover:text-teal-500 font-medium">
+                      Notes
                     </Link>
                     <button
                       onClick={() => reuploadRefs.current[doc.id]?.click()}
