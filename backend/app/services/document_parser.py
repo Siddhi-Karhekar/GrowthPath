@@ -51,6 +51,17 @@ def _parse_docx(file_bytes: bytes) -> str:
     return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
 
 
+def ocr_image(file_bytes: bytes) -> str:
+    """OCRs a single photo (e.g. a phone photo of a handwritten test answer).
+    Reuses the same Tesseract path as the scanned-PDF fallback above - no new
+    dependency. Tesseract is a printed-text OCR engine, not a handwriting
+    model, so quality on cursive/messy handwriting will be rough; the caller
+    is expected to let the student review/edit the result rather than trust
+    it blindly."""
+    image = Image.open(io.BytesIO(file_bytes))
+    return pytesseract.image_to_string(image).strip()
+
+
 def chunk_text(text: str, chunk_size: int = 900, overlap: int = 150) -> list[str]:
     """Simple sliding-window chunker on whitespace-normalized text.
     Good enough for RAG grounding without pulling in a heavier text splitter."""

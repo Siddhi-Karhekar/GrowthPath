@@ -23,6 +23,8 @@ export default function TestTakingPage() {
   const [startedAt] = useState(() => Date.now());
   const [sessionScore, setSessionScore] = useState(0);
   const [sessionMax, setSessionMax] = useState(0);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!testId) return;
@@ -104,6 +106,19 @@ export default function TestTakingPage() {
     }
   }
 
+  async function handleHandwrittenUpload(file: File) {
+    setOcrLoading(true);
+    setOcrError(null);
+    try {
+      const { text } = await api.ocrAnswerImage(file);
+      setResponse((prev) => (prev.trim() ? `${prev}\n\n${text}` : text));
+    } catch (e) {
+      setOcrError((e as Error).message);
+    } finally {
+      setOcrLoading(false);
+    }
+  }
+
   if (submitting) return <p className="text-slate-500">Grading your answers...</p>;
 
   if (!current) {
@@ -147,13 +162,37 @@ export default function TestTakingPage() {
             ))}
           </div>
         ) : (
-          <textarea
-            value={response}
-            onChange={(e) => setResponse(e.target.value)}
-            rows={6}
-            placeholder="Write your answer..."
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
-          />
+          <div>
+            <textarea
+              value={response}
+              onChange={(e) => setResponse(e.target.value)}
+              rows={6}
+              placeholder="Write your answer, or upload a photo of a handwritten answer below..."
+              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            />
+            <div className="mt-2 flex items-center gap-3">
+              <label className="text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-500 cursor-pointer">
+                {ocrLoading ? "Reading photo..." : "\ud83d\udcf7 Upload a photo of a handwritten answer"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  disabled={ocrLoading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = ""; // allow re-selecting the same file
+                    if (file) void handleHandwrittenUpload(file);
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              We'll read the text out with OCR and drop it in above - handwriting recognition isn't
+              perfect, so check it over before submitting.
+            </p>
+            {ocrError && <p className="text-xs text-red-600 mt-1">{ocrError}</p>}
+          </div>
         )}
 
         {error && <p className="text-sm text-red-600 mt-3">{error}</p>}

@@ -90,6 +90,11 @@ class MCQCheckResponse(BaseModel):
     is_correct: Optional[bool] = None  # None for non-MCQ questions (nothing to check live)
 
 
+class OCRAnswerOut(BaseModel):
+    text: str  # extracted text only - the student reviews/edits it before submitting,
+    # since handwriting OCR quality varies and this feeds straight into LLM grading.
+
+
 class AdaptiveNextRequest(BaseModel):
     answered_question_ids: list[str] = Field(default_factory=list)
     running_score: float = 0.0

@@ -49,6 +49,10 @@ export interface TestGenerateRequest {
   topic_focus?: string | null;
 }
 
+export interface OCRAnswerOut {
+  text: string;
+}
+
 export interface GradedAnswerOut {
   question_id: string;
   score: number;

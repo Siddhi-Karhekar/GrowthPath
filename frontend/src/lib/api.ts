@@ -5,6 +5,7 @@ import type {
   ConceptGraphOut,
   DocumentOut,
   NoteOut,
+  OCRAnswerOut,
   ProgressSummaryOut,
   QuestionOut,
   StudyGuideOut,
@@ -86,6 +87,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ response }),
     }),
+
+  ocrAnswerImage: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<OCRAnswerOut>("/api/tests/ocr-answer", { method: "POST", body: form });
+  },
 
   nextAdaptiveQuestion: (
     testId: string,

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from app.core.security import get_current_user_id
 from app.core.supabase_client import get_supabase
@@ -6,14 +6,18 @@ from app.models.schemas import (
     AdaptiveNextRequest,
     MCQCheckRequest,
     MCQCheckResponse,
+    OCRAnswerOut,
     QuestionOut,
     TestGenerateRequest,
     TestOut,
 )
 from app.services.adaptive_service import check_mcq_correct, get_next_question
+from app.services.document_parser import ocr_image
 from app.services.test_generation import generate_test
 
 router = APIRouter()
+
+MAX_OCR_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB - generous for a single phone photo
 
 
 @router.post("/generate", response_model=TestOut)
@@ -53,6 +57,30 @@ def check_question(question_id: str, req: MCQCheckRequest, user_id: str = Depend
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
     return {"is_correct": is_correct}
+
+
+@router.post("/ocr-answer", response_model=OCRAnswerOut)
+async def ocr_answer(file: UploadFile, user_id: str = Depends(get_current_user_id)):
+    """Extracts text from a photo of a handwritten theory answer, so a
+    student can photograph a written answer instead of typing it. Returns
+    the raw extracted text only - nothing is persisted here, and the
+    frontend puts it in the editable answer box so the student can fix any
+    OCR mistakes before it's actually submitted for grading."""
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(400, "Upload a photo (JPG/PNG/etc), not a document.")
+
+    file_bytes = await file.read()
+    if len(file_bytes) > MAX_OCR_UPLOAD_BYTES:
+        raise HTTPException(413, "Image too large (max 10MB).")
+
+    try:
+        text = ocr_image(file_bytes)
+    except Exception as exc:
+        raise HTTPException(400, "Couldn't read that image - try a clearer, well-lit photo.") from exc
+
+    if not text:
+        raise HTTPException(422, "No text could be read from that image - try a clearer, well-lit photo.")
+    return {"text": text}
 
 
 def _load_test(test_id: str, user_id: str) -> dict:
