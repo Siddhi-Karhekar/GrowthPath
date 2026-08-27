@@ -16,6 +16,7 @@ emphasis heuristic, not a claim of knowing real exam questions):
 import json
 import uuid
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from app.core.groq_client import chat_completion
 from app.core.supabase_client import get_supabase
@@ -50,16 +51,18 @@ def generate_study_guide(user_id: str, document_id: str) -> dict:
     topics = _predict_topics(by_topic, importance_by_topic)
 
     study_guide_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
     supabase.table("study_guides").insert(
         {
             "id": study_guide_id,
             "user_id": user_id,
             "document_id": document_id,
             "topics": topics,
+            "created_at": now,
         }
     ).execute()
 
-    return {"id": study_guide_id, "document_id": document_id, "topics": topics}
+    return {"id": study_guide_id, "document_id": document_id, "topics": topics, "created_at": now}
 
 
 def _predict_topics(by_topic: dict[str, list[str]], importance_by_topic: dict[str, float]) -> list[dict]:
