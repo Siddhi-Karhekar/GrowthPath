@@ -4,6 +4,15 @@ A personal study-growth platform: upload your own notes/textbook chapters, get a
 
 Every service used here has a genuine free tier suitable for a portfolio project. Nothing below requires a credit card.
 
+## Live Demo
+
+The project is deployed and live - no setup needed to try it:
+
+- **App**: https://growthpath-frontend.onrender.com
+- **API health check**: https://growthpath-backend.onrender.com/api/health
+
+Both services run on Render's free tier, so the first request after a period of inactivity can take 30-50 seconds to wake up (cold start) - reload if the first load seems stuck. Sign up with any email (Supabase emails a confirmation link) - there's only one account type, no separate teacher/admin login, since this is a self-study platform.
+
 ## Features
 
 - **Test mode or study-guide mode** - for any uploaded document, choose to take a generated test (MCQ/theory, configurable total marks, optional adaptive difficulty) or generate a "study guide" that ranks the document's topics by how much of the material covers them, with a predicted question format and mark range per topic. The study guide is explicit that this is an estimate derived from the student's own material, not a leaked or guaranteed question.
