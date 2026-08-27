@@ -41,3 +41,25 @@ textarea,
   background: #99f6e4;
   color: #134e4a;
 }
+
+/* "Download as PDF" on Notes/Study guide: rather than fighting the app
+   shell's flex/overflow layout for print, hide everything except the
+   element marked #printable-content and let it fill the printed page -
+   the standard print-one-element trick. Triggered via window.print(),
+   letting the student's own browser "Save as PDF" print destination do
+   the actual PDF creation - no server-side PDF library needed. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-content,
+  #printable-content * {
+    visibility: visible;
+  }
+  #printable-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

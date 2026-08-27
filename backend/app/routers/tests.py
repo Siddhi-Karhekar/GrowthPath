@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
+from app.core.rate_limit import enforce_cooldown
 from app.core.security import get_current_user_id
 from app.core.supabase_client import get_supabase
 from app.models.schemas import (
@@ -22,6 +23,7 @@ MAX_OCR_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB - generous for a single phone ph
 
 @router.post("/generate", response_model=TestOut)
 def create_test(req: TestGenerateRequest, user_id: str = Depends(get_current_user_id)):
+    enforce_cooldown(user_id, "test_generate")
     try:
         test_id = generate_test(user_id, req)
     except ValueError as exc:

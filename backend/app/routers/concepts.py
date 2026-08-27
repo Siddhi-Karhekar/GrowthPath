@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.rate_limit import enforce_cooldown
 from app.core.security import get_current_user_id
 from app.models.schemas import (
     ConceptCandidateOut,
@@ -23,6 +24,10 @@ def build(req: ConceptGraphBuildRequest, user_id: str = Depends(get_current_user
     terms since the last build (embedding match + LLM disambiguation), then
     proposes edges between concepts. Safe to call repeatedly - already
     resolved terms are skipped."""
+    # Longer cooldown than other generation endpoints: a build does several
+    # batched LLM calls, and two overlapping builds for the same subject
+    # could otherwise race each other's dedup logic.
+    enforce_cooldown(user_id, "concepts_build", seconds=20.0)
     try:
         return build_subject_graph(user_id, req.subject_id)
     except ValueError as exc:

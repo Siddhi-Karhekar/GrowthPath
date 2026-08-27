@@ -1,19 +1,42 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
-import type { QuestionFormat } from "../types/api";
+import type { DocumentOut, QuestionFormat } from "../types/api";
 
 export default function TestConfigPage() {
   const [params] = useSearchParams();
-  const documentId = params.get("document") ?? "";
+  const documentParam = params.get("document") ?? "";
+  const subjectParam = params.get("subject") ?? "";
+  const topicParam = params.get("topic") ?? "";
   const navigate = useNavigate();
+
+  const [documentId, setDocumentId] = useState(documentParam);
+  const [subjectDocuments, setSubjectDocuments] = useState<DocumentOut[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
 
   const [format, setFormat] = useState<QuestionFormat>("mixed");
   const [totalMarks, setTotalMarks] = useState(40);
   const [adaptive, setAdaptive] = useState(false);
-  const [topicFocus, setTopicFocus] = useState("");
+  const [topicFocus, setTopicFocus] = useState(topicParam);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Coming from the knowledge graph ("Practice this concept") gives a subject,
+  // not a specific document - a concept can span several documents in that
+  // subject, so let the student pick which one to generate the test from.
+  useEffect(() => {
+    if (documentParam || !subjectParam) return;
+    setLoadingDocuments(true);
+    api
+      .listDocuments(subjectParam)
+      .then((docs) => {
+        const ready = docs.filter((d) => d.status === "ready");
+        setSubjectDocuments(ready);
+        if (ready.length > 0) setDocumentId(ready[0].id);
+      })
+      .catch((e) => setError((e as Error).message))
+      .finally(() => setLoadingDocuments(false));
+  }, [documentParam, subjectParam]);
 
   async function handleGenerate() {
     setGenerating(true);
@@ -37,9 +60,32 @@ export default function TestConfigPage() {
   return (
     <div className="max-w-lg">
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Create a test</h1>
-      <p className="text-sm text-slate-500 mb-6">Configure how you want to be tested on this document.</p>
+      <p className="text-sm text-slate-500 mb-6">
+        {topicParam ? `Configure a practice test focused on "${topicParam}".` : "Configure how you want to be tested on this document."}
+      </p>
 
       <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-6 space-y-5 shadow-sm shadow-teal-500/5">
+        {subjectParam && !documentParam && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Document</label>
+            {loadingDocuments ? (
+              <p className="text-sm text-slate-400">Loading documents...</p>
+            ) : subjectDocuments.length === 0 ? (
+              <p className="text-sm text-slate-400">No ready documents in this subject yet.</p>
+            ) : (
+              <select
+                value={documentId}
+                onChange={(e) => setDocumentId(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              >
+                {subjectDocuments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.filename}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Question format</label>
           <div className="flex gap-2">

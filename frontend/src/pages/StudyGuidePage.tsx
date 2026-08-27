@@ -45,13 +45,21 @@ export default function StudyGuidePage() {
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Study guide</h1>
         {guide && (
-          <button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="text-sm text-teal-600 hover:text-teal-500 font-medium disabled:opacity-50"
-          >
-            {generating ? "Regenerating..." : "Regenerate"}
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.print()}
+              className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-medium"
+            >
+              Download as PDF
+            </button>
+            <button
+              onClick={handleGenerate}
+              disabled={generating}
+              className="text-sm text-teal-600 hover:text-teal-500 font-medium disabled:opacity-50"
+            >
+              {generating ? "Regenerating..." : "Regenerate"}
+            </button>
+          </div>
         )}
       </div>
       <p className="text-sm text-slate-500 mb-1">
@@ -72,7 +80,11 @@ export default function StudyGuidePage() {
           {generating ? "Analyzing document..." : "Generate study guide"}
         </button>
       ) : (
-        <div className="space-y-3">
+        <div id="printable-content" className="space-y-3">
+          <h1 className="hidden print:block text-xl font-semibold text-slate-900 mb-1">Study guide</h1>
+          <p className="hidden print:block text-xs text-slate-400 mb-4">
+            GrowthPath study guide - generated {new Date(guide.created_at).toLocaleDateString()}
+          </p>
           {guide.topics.map((t) => (
             <div key={t.topic} className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-4 shadow-sm shadow-teal-500/5">
               <div className="flex items-center justify-between mb-1.5">

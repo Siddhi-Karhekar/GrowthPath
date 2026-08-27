@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.rate_limit import enforce_cooldown
 from app.core.security import get_current_user_id
 from app.models.schemas import StudyGuideGenerateRequest, StudyGuideOut
 from app.services.study_guide_service import generate_study_guide, get_latest_study_guide
@@ -9,6 +10,7 @@ router = APIRouter()
 
 @router.post("/generate", response_model=StudyGuideOut)
 def generate(req: StudyGuideGenerateRequest, user_id: str = Depends(get_current_user_id)):
+    enforce_cooldown(user_id, "study_guide_generate")
     try:
         return generate_study_guide(user_id, req.document_id)
     except ValueError as exc:

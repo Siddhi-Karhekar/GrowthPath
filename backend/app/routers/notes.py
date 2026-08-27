@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.rate_limit import enforce_cooldown
 from app.core.security import get_current_user_id
 from app.models.schemas import NoteCreateRequest, NoteGenerateRequest, NoteOut
 from app.services.notes_service import create_freehand_note, generate_notes, get_latest_notes, list_notes
@@ -11,6 +12,7 @@ router = APIRouter()
 
 @router.post("/generate", response_model=NoteOut)
 def generate(req: NoteGenerateRequest, user_id: str = Depends(get_current_user_id)):
+    enforce_cooldown(user_id, "notes_generate")
     try:
         return generate_notes(user_id, req.document_id)
     except ValueError as exc:

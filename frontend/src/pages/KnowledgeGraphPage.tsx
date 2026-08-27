@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import type { ConceptCandidateOut, ConceptGraphOut, RelationType, SubjectOut } from "../types/api";
+import type { ConceptCandidateOut, ConceptGraphOut, ConceptOut, RelationType, SubjectOut } from "../types/api";
+
+// Same 0.7 "Strong" threshold masteryColor() below uses - a concept counts
+// as mastered enough to unlock what comes after it.
+const MASTERED_THRESHOLD = 0.7;
 
 // ---------------------------------------------------------------------------
 // A small, dependency-free force-directed layout (Fruchterman-Reingold
@@ -106,6 +111,7 @@ const WIDTH = 860;
 const HEIGHT = 560;
 
 export default function KnowledgeGraphPage() {
+  const navigate = useNavigate();
   const [subjects, setSubjects] = useState<SubjectOut[]>([]);
   const [activeSubject, setActiveSubject] = useState<string>("");
   const [graph, setGraph] = useState<ConceptGraphOut | null>(null);
@@ -163,6 +169,45 @@ export default function KnowledgeGraphPage() {
       HEIGHT
     );
   }, [graph]);
+
+  // "What to learn next": concepts that aren't mastered yet but whose
+  // prerequisites (walked via "prerequisite" edges) all are - pure graph
+  // logic over data already loaded, no extra LLM call needed.
+  const learnNext = useMemo(() => {
+    if (!graph) return [];
+    const masteryById = new Map(graph.concepts.map((c) => [c.id, c.mastery]));
+    const isMastered = (m: number | null | undefined) => m != null && m >= MASTERED_THRESHOLD;
+
+    const prereqsByTarget = new Map<string, string[]>();
+    graph.edges.forEach((e) => {
+      if (e.relation_type !== "prerequisite") return;
+      const list = prereqsByTarget.get(e.target_concept_id) ?? [];
+      list.push(e.source_concept_id);
+      prereqsByTarget.set(e.target_concept_id, list);
+    });
+
+    return graph.concepts
+      .filter((c) => !isMastered(c.mastery))
+      .filter((c) => {
+        const prereqs = prereqsByTarget.get(c.id) ?? [];
+        return prereqs.length === 0 || prereqs.every((pid) => isMastered(masteryById.get(pid)));
+      })
+      .sort((a, b) => {
+        const aHasPrereqs = (prereqsByTarget.get(a.id) ?? []).length > 0 ? 0 : 1;
+        const bHasPrereqs = (prereqsByTarget.get(b.id) ?? []).length > 0 ? 0 : 1;
+        if (aHasPrereqs !== bHasPrereqs) return aHasPrereqs - bHasPrereqs;
+        return (a.mastery ?? -1) - (b.mastery ?? -1);
+      })
+      .slice(0, 3);
+  }, [graph]);
+
+  const selectedConceptData: ConceptOut | null =
+    (graph && selectedConcept && graph.concepts.find((c) => c.id === selectedConcept)) || null;
+
+  function practiceConcept(canonicalName: string) {
+    if (!activeSubject) return;
+    navigate(`/tests/new?subject=${activeSubject}&topic=${encodeURIComponent(canonicalName)}`);
+  }
 
   return (
     <div className="space-y-6">
@@ -285,6 +330,46 @@ export default function KnowledgeGraphPage() {
           </div>
 
           <div className="w-full lg:w-64 shrink-0 space-y-5">
+            {selectedConceptData && (
+              <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-4 shadow-sm shadow-teal-500/5">
+                <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Selected concept</h2>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{selectedConceptData.canonical_name}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {selectedConceptData.mastery !== null
+                    ? `${Math.round(selectedConceptData.mastery * 100)}% mastery`
+                    : "Not yet tested"}
+                </p>
+                <button
+                  onClick={() => practiceConcept(selectedConceptData.canonical_name)}
+                  className="mt-3 w-full rounded-lg bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400 text-white text-xs font-medium px-3 py-2 shadow-sm shadow-teal-500/25"
+                >
+                  Practice this concept
+                </button>
+              </div>
+            )}
+
+            {learnNext.length > 0 && (
+              <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-sky-200 dark:border-sky-900/40 rounded-2xl p-4 shadow-sm shadow-sky-500/5">
+                <h2 className="text-xs font-semibold text-sky-600 dark:text-sky-400 uppercase tracking-wide mb-1">What to learn next</h2>
+                <p className="text-xs text-slate-500 mb-3">
+                  Concepts you haven't mastered yet, whose prerequisites you have.
+                </p>
+                <div className="space-y-2">
+                  {learnNext.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-slate-700 dark:text-slate-300 truncate">{c.canonical_name}</span>
+                      <button
+                        onClick={() => practiceConcept(c.canonical_name)}
+                        className="shrink-0 text-xs text-teal-600 hover:text-teal-500 font-medium"
+                      >
+                        Practice
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-4 shadow-sm shadow-teal-500/5">
               <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Mastery</h2>
               <div className="space-y-2 text-sm">
