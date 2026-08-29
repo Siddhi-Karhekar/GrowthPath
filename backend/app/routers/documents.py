@@ -13,6 +13,12 @@ router = APIRouter()
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20MB - generous for lecture notes/PDFs, keeps free-tier storage in check
 DOCUMENT_COLUMNS = "id, filename, status, page_count, subject_id, version, document_type, source_type, source_url, created_at, updated_at"
+ALLOWED_UPLOAD_EXTENSIONS = (".pdf", ".docx", ".txt")  # kept in sync with document_parser.parse_document
+
+
+def _validate_upload_filename(filename: str | None) -> None:
+    if not filename or not filename.lower().endswith(ALLOWED_UPLOAD_EXTENSIONS):
+        raise HTTPException(400, "Unsupported file type - upload a PDF, DOCX, or TXT file.")
 
 
 @router.post("", response_model=DocumentOut)
@@ -23,6 +29,8 @@ async def upload_document(
     document_type: str = Form(default="textbook"),
     user_id: str = Depends(get_current_user_id),
 ):
+    _validate_upload_filename(file.filename)
+
     file_bytes = await file.read()
     if len(file_bytes) > MAX_UPLOAD_BYTES:
         raise HTTPException(413, "File too large (max 20MB on the free tier).")
@@ -108,6 +116,8 @@ async def reupload_document(
     )
     if not existing.data:
         raise HTTPException(404, "Document not found")
+
+    _validate_upload_filename(file.filename)
 
     file_bytes = await file.read()
     if len(file_bytes) > MAX_UPLOAD_BYTES:

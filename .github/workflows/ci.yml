@@ -22,6 +22,10 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Import sanity check
         run: python -c "import app.main"
+      - name: Dependency vulnerability scan
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
 
   frontend:
     runs-on: ubuntu-latest
@@ -37,3 +41,5 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+      - name: Dependency vulnerability scan
+        run: npm audit --audit-level=high

@@ -95,6 +95,16 @@ def build_subject_graph(user_id: str, subject_id: str) -> dict:
 def get_subject_graph(user_id: str, subject_id: str) -> dict:
     supabase = get_supabase()
 
+    # Ownership check up front: concept_edges has no user_id column of its
+    # own (only subject_id), so without this a caller could pass another
+    # user's subject_id and read that subject's edges even though the
+    # concepts query below is correctly scoped - confirming the subject
+    # itself belongs to this user closes that gap before any concept/edge
+    # data is touched.
+    subject_res = supabase.table("subjects").select("id").eq("id", subject_id).eq("user_id", user_id).execute()
+    if not subject_res.data:
+        return {"subject_id": subject_id, "concepts": [], "edges": []}
+
     concepts_res = (
         supabase.table("concepts")
         .select("id, canonical_name, description")

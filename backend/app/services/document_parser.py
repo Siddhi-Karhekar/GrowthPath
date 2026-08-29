@@ -9,6 +9,8 @@ the same way as an upload, and any other URL is treated as an HTML page and
 reduced to its readable text.
 """
 import io
+import ipaddress
+import socket
 
 import fitz  # PyMuPDF
 import httpx
@@ -89,21 +91,66 @@ def chunk_text(text: str, chunk_size: int = 900, overlap: int = 150) -> list[str
 # ---------------------------------------------------------------------------
 
 ALLOWED_SCHEMES = ("http", "https")
+MAX_REDIRECTS = 5
+
+
+def _is_public_hostname(hostname: str) -> bool:
+    """Resolves a hostname and rejects it unless every address it resolves
+    to is a normal public internet address - blocks SSRF via a link that
+    points at loopback (127.0.0.1), a private range (10/8, 192.168/16,
+    172.16/12), link-local (169.254.0.0/16 - notably cloud metadata
+    endpoints like 169.254.169.254), or other reserved ranges."""
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
+            return False
+    return True
+
+
+def _validate_fetch_url(url: str) -> None:
+    if "://" not in url:
+        raise ValueError("Only http/https links are supported.")
+    scheme, rest = url.split("://", 1)
+    if scheme.lower() not in ALLOWED_SCHEMES:
+        raise ValueError("Only http/https links are supported.")
+    hostname = rest.split("/", 1)[0].split("@")[-1].split(":")[0]
+    if not hostname or not _is_public_hostname(hostname):
+        raise ValueError("That link points to a private or internal address, which isn't allowed.")
 
 
 def fetch_url(url: str) -> tuple[bytes, str]:
     """Downloads a URL and returns (content_bytes, content_type). Kept as a
     separate step from parsing so document_service can persist the raw bytes
-    to Storage before parsing, same as an uploaded file."""
-    scheme = url.split("://", 1)[0].lower() if "://" in url else ""
-    if scheme not in ALLOWED_SCHEMES:
-        raise ValueError("Only http/https links are supported.")
+    to Storage before parsing, same as an uploaded file.
 
-    with httpx.Client(follow_redirects=True, timeout=30.0, headers={"User-Agent": USER_AGENT}) as client:
-        resp = client.get(url)
-    resp.raise_for_status()
-    content_type = resp.headers.get("content-type", "").split(";")[0].strip().lower()
-    return resp.content, content_type
+    Validates the target isn't a private/internal address before every hop
+    (including redirects, followed manually here rather than via httpx's
+    auto-follow) so a submitted link can't be used to make the server fetch
+    internal-only resources (SSRF) - e.g. a cloud metadata endpoint or a
+    service on Render's private network."""
+    _validate_fetch_url(url)
+
+    current_url = url
+    with httpx.Client(follow_redirects=False, timeout=30.0, headers={"User-Agent": USER_AGENT}) as client:
+        for _ in range(MAX_REDIRECTS + 1):
+            resp = client.get(current_url)
+            if resp.is_redirect:
+                location = resp.headers.get("location")
+                if not location:
+                    resp.raise_for_status()
+                current_url = str(httpx.URL(current_url).join(location))
+                _validate_fetch_url(current_url)
+                continue
+            resp.raise_for_status()
+            content_type = resp.headers.get("content-type", "").split(";")[0].strip().lower()
+            return resp.content, content_type
+    raise ValueError("Too many redirects.")
 
 
 def parse_url_content(content: bytes, content_type: str, url: str) -> tuple[str, int]:
