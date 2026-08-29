@@ -37,14 +37,24 @@ def parse_document(file_bytes: bytes, filename: str) -> tuple[str, int]:
 def _parse_pdf(file_bytes: bytes) -> tuple[str, int]:
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     pages_text = []
-    for page in doc:
+    ocr_count = 0
+    for page_index, page in enumerate(doc):
         text = page.get_text().strip()
         if not text:
             # No extractable text layer -> likely a scanned page, OCR it.
-            pix = page.get_pixmap(dpi=200)
+            # 150 DPI + grayscale instead of 200 DPI + RGB roughly halves
+            # Tesseract's per-page work (still plenty sharp for printed
+            # text) - OCR is the slow part of ingestion by far, and Render's
+            # free-tier CPU is weak/shared, so a scanned PDF of any real
+            # length can otherwise take many minutes.
+            pix = page.get_pixmap(dpi=150, colorspace=fitz.csGRAY)
             image = Image.open(io.BytesIO(pix.tobytes("png")))
             text = pytesseract.image_to_string(image)
+            ocr_count += 1
+            print(f"[document parse] OCR'd page {page_index + 1}/{len(doc)}")
         pages_text.append(text)
+    if ocr_count:
+        print(f"[document parse] OCR fallback used on {ocr_count}/{len(doc)} page(s)")
     return "\n\n".join(pages_text), len(doc)
 
 
