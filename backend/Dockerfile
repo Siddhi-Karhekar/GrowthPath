@@ -18,6 +18,16 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Bake the embedding model's weights into the image at build time instead of
+# letting the first request on a fresh container download them from Hugging
+# Face over the network. Without this, every deploy AND every free-tier
+# cold start (Render spins the instance down after inactivity) pays that
+# download on the very first document a student uploads - this makes that
+# first request instant instead, since sentence-transformers finds the
+# weights already cached locally. Must match EMBEDDING_MODEL_NAME in
+# render.yaml / .env.
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
 COPY app ./app
 
 EXPOSE 8000
