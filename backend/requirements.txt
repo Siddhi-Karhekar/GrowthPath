@@ -6,6 +6,7 @@ python-multipart==0.0.32
 supabase==2.7.4
 groq==0.11.0
 sentence-transformers==5.7.0
+accelerate==1.14.0
 scikit-learn==1.5.2
 numpy==1.26.4
 pandas==2.2.3
