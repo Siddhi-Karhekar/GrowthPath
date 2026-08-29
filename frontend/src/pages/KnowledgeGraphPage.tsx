@@ -268,8 +268,8 @@ export default function KnowledgeGraphPage() {
           No graph yet for this subject. Upload some material, then click "Build / update graph".
         </div>
       ) : (
-        <div className="flex gap-6 flex-wrap lg:flex-nowrap">
-          <JournalCard hoverable={false} className="p-3 overflow-x-auto">
+        <div className="flex gap-6 flex-wrap xl:flex-nowrap">
+          <JournalCard hoverable={false} className="p-3 overflow-x-auto min-w-0">
             <svg width={WIDTH} height={HEIGHT} className="max-w-full">
               <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
