@@ -27,6 +27,16 @@ def submit_attempt(user_id: str, test_id: str, answers: list[dict], time_taken_s
     questions_by_id = {q["id"]: q for q in q_res.data or []}
 
     graded = grade_answers(questions_by_id, answers)
+
+    # Per-question timing/revisits come straight from the client (nothing to
+    # grade here) - merge them onto the graded dicts so they flow through to
+    # both the DB insert and the response in one place.
+    answers_by_id = {a["question_id"]: a for a in answers}
+    for g in graded:
+        original = answers_by_id.get(g["question_id"], {})
+        g["time_taken_seconds"] = original.get("time_taken_seconds")
+        g["revisit_count"] = original.get("revisit_count", 0)
+
     total_score = sum(g["score"] for g in graded)
     max_score = sum(g["max_score"] for g in graded)
 
@@ -46,12 +56,14 @@ def submit_attempt(user_id: str, test_id: str, answers: list[dict], time_taken_s
         {
             "attempt_id": attempt_id,
             "question_id": g["question_id"],
-            "response": next((a["response"] for a in answers if a["question_id"] == g["question_id"]), ""),
+            "response": answers_by_id.get(g["question_id"], {}).get("response", ""),
             "score": g["score"],
             "is_correct": g["is_correct"],
             "confidence": g["confidence"],
             "feedback": g["feedback"],
             "needs_review": g["needs_review"],
+            "time_taken_seconds": g["time_taken_seconds"],
+            "revisit_count": g["revisit_count"],
         }
         for g in graded
     ]

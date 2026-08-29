@@ -61,6 +61,8 @@ export interface GradedAnswerOut {
   confidence: number | null;
   feedback: string;
   needs_review: boolean;
+  time_taken_seconds: number | null;
+  revisit_count: number;
 }
 
 export interface AttemptResultOut {

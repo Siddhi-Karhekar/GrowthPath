@@ -1,6 +1,13 @@
 import { Link, useLocation, useParams } from "react-router-dom";
 import type { AttemptResultOut } from "../types/api";
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+}
+
 export default function ResultsPage() {
   const { attemptId } = useParams();
   const location = useLocation();
@@ -47,6 +54,13 @@ export default function ResultsPage() {
               )}
             </div>
             <p className="text-sm text-slate-600 dark:text-slate-400">{a.feedback}</p>
+            {(a.time_taken_seconds !== null || a.revisit_count > 0) && (
+              <p className="text-xs text-slate-400 mt-2">
+                {a.time_taken_seconds !== null && `Spent ${formatDuration(a.time_taken_seconds)}`}
+                {a.time_taken_seconds !== null && a.revisit_count > 0 && " · "}
+                {a.revisit_count > 0 && `Revisited ${a.revisit_count}x`}
+              </p>
+            )}
           </div>
         ))}
       </div>

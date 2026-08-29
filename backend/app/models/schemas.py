@@ -116,6 +116,8 @@ class TestOut(BaseModel):
 class SubmittedAnswer(BaseModel):
     question_id: str
     response: str  # selected option text for MCQ, free text for theory
+    time_taken_seconds: Optional[int] = None  # time spent on this question specifically
+    revisit_count: int = 0  # how many times the student returned to this question (0 for adaptive - forward-only)
 
 
 class AttemptSubmitRequest(BaseModel):
@@ -132,6 +134,8 @@ class GradedAnswerOut(BaseModel):
     confidence: Optional[float] = None  # LLM grading confidence, theory only
     feedback: str
     needs_review: bool = False
+    time_taken_seconds: Optional[int] = None
+    revisit_count: int = 0
 
 
 class AttemptResultOut(BaseModel):

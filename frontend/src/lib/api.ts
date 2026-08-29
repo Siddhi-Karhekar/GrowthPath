@@ -111,7 +111,7 @@ export const api = {
 
   submitAttempt: (
     testId: string,
-    answers: { question_id: string; response: string }[],
+    answers: { question_id: string; response: string; time_taken_seconds?: number; revisit_count?: number }[],
     timeTakenSeconds: number
   ) =>
     request<AttemptResultOut>("/api/attempts/submit", {

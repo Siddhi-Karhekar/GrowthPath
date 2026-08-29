@@ -16,6 +16,7 @@ Both services run on Render's free tier, so the first request after a period of 
 ## Features
 
 - **Test mode or study-guide mode** - for any uploaded document, choose to take a generated test (MCQ/theory, configurable total marks, optional adaptive difficulty) or generate a "study guide" that ranks the document's topics by how much of the material covers them, with a predicted question format and mark range per topic. The study guide is explicit that this is an estimate derived from the student's own material, not a leaked or guaranteed question.
+- **Handwritten answers and per-question analytics** - during a non-adaptive test you can navigate back to a previous question to review or change your answer; the platform tracks how long you spent on each question and how many times you revisited it (shown on the Results page), and theory answers can be submitted as a photo of handwritten work, OCR'd into the editable answer box so you can fix any misreads before it's graded.
 - **Subject folders** - documents can be filed into subjects (e.g. "Biology", "Organic Chemistry"); the Documents page, mastery tracking, and the Growth/progress dashboard can all be filtered to a single subject or viewed across all of them.
 - **Document versioning** - a document can be replaced with an updated version of the same file (e.g. updated lecture notes) without losing its history; old chunks/embeddings are cleared and reprocessed, and the version number increments.
 - **Notes from uploads or textbook links** - alongside uploading your own notes as a document, you can paste a link to a textbook (a direct PDF link, or a webpage) and GrowthPath ingests it the same way as an upload, then generate condensed, source-grounded study notes from any document with one click - distinct from "study guide" mode, which predicts exam emphasis rather than summarizing content.
@@ -54,13 +55,14 @@ Both services run on Render's free tier, so the first request after a period of 
 2. In **SQL Editor**, run `docs/schema.sql` from this repo - it creates all tables, enables `pgvector`, sets up row-level security, and creates the similarity-search function.
 3. Then run `docs/migration_001_subjects_and_study_guides.sql` - it's additive and adds the `subjects` table, document versioning columns, and the `study_guides` table used by the features above. Run it even on a brand-new project, right after `schema.sql`.
 4. Then run `docs/migration_002_notes_and_knowledge_graph.sql` - additive, adds link-ingestion columns on `documents`, the `notes` table, the knowledge-graph tables (`concepts`, `concept_aliases`, `concept_edges`, `concept_resolution_candidates`), `topic_mastery_history`, and the `match_concepts` function. Also run on a brand-new project, right after migration_001.
-5. In **Storage**, create a bucket named `documents` (private, not public).
-6. In **Settings -> API**, copy:
+5. Then run `docs/migration_003_answer_timing.sql` - additive, adds `time_taken_seconds` and `revisit_count` columns to `answers` so per-question timing/revisit data has somewhere to land. Also run on a brand-new project, right after migration_002.
+6. In **Storage**, create a bucket named `documents` (private, not public).
+7. In **Settings -> API**, copy:
    - `Project URL` -> `SUPABASE_URL` / `VITE_SUPABASE_URL`
    - `anon public` key -> `VITE_SUPABASE_ANON_KEY`
    - `service_role` key -> `SUPABASE_SERVICE_ROLE_KEY` (backend only, never in frontend code)
-7. Newer Supabase projects sign auth tokens asymmetrically (JWT Signing Keys) rather than with a single shared secret - the backend verifies tokens against your project's JWKS endpoint automatically, with a legacy `SUPABASE_JWT_SECRET` shared-secret fallback for older projects (**Settings -> API -> JWT Settings**, if present).
-8. In **Authentication -> Providers**, email/password sign-up is enabled by default - that's all this project uses. If you don't want to wire up email confirmation for local dev, you can disable "Confirm email" in the Email provider settings.
+8. Newer Supabase projects sign auth tokens asymmetrically (JWT Signing Keys) rather than with a single shared secret - the backend verifies tokens against your project's JWKS endpoint automatically, with a legacy `SUPABASE_JWT_SECRET` shared-secret fallback for older projects (**Settings -> API -> JWT Settings**, if present).
+9. In **Authentication -> Providers**, email/password sign-up is enabled by default - that's all this project uses. If you don't want to wire up email confirmation for local dev, you can disable "Confirm email" in the Email provider settings.
 
 ### 2. Groq (free LLM API)
 
