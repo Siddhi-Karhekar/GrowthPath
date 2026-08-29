@@ -1,24 +1,17 @@
-/** Simple mark: an upward growth arrow inside a soft teal-to-sky gradient
- * circle, paired with the wordmark. No external icon library needed. */
+/** Brand mark: a teal avatar circle with the "G" initial, paired with the
+ * Literata wordmark and journal tagline - the "Serene Scholar" lockup from
+ * the mockups' sidebar/auth screens. */
 export default function Logo({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-teal-400 to-sky-500 flex items-center justify-center shrink-0 shadow-sm shadow-teal-500/30">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M4 17L10 11L14 15L20 8"
-            stroke="white"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path d="M14 8H20V14" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0 text-on-primary font-display-hero text-headline-md">
+        G
       </div>
       {!compact && (
-        <span className="text-lg font-semibold tracking-tight text-slate-800 dark:text-slate-100">
-          GrowthPath
-        </span>
+        <div className="leading-none">
+          <h1 className="font-display-hero text-headline-md text-primary leading-none">GrowthPath</h1>
+          <p className="font-body-md text-caption text-on-surface-variant mt-1">Your Digital Journal</p>
+        </div>
       )}
     </div>
   );

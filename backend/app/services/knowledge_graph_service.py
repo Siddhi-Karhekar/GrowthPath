@@ -119,17 +119,67 @@ def get_subject_graph(user_id: str, subject_id: str) -> dict:
 
     concept_ids = [c["id"] for c in concepts]
     aliases_by_concept: dict[str, list[str]] = {}
+    # concept_id -> ordered-unique document ids it was actually drawn from,
+    # via each alias's source_document_id - lets the UI show real linked
+    # source material ("Recent Insights") per concept instead of nothing.
+    source_doc_ids_by_concept: dict[str, list[str]] = {}
     if concept_ids:
-        alias_res = supabase.table("concept_aliases").select("concept_id, alias").in_("concept_id", concept_ids).execute()
+        alias_res = (
+            supabase.table("concept_aliases")
+            .select("concept_id, alias, source_document_id")
+            .in_("concept_id", concept_ids)
+            .execute()
+        )
         for row in alias_res.data or []:
             aliases_by_concept.setdefault(row["concept_id"], []).append(row["alias"])
+            doc_id = row.get("source_document_id")
+            if doc_id:
+                doc_list = source_doc_ids_by_concept.setdefault(row["concept_id"], [])
+                if doc_id not in doc_list:
+                    doc_list.append(doc_id)
+
+    all_doc_ids = sorted({doc_id for doc_ids in source_doc_ids_by_concept.values() for doc_id in doc_ids})
+    filename_by_doc: dict[str, str] = {}
+    latest_note_id_by_doc: dict[str, str] = {}
+    if all_doc_ids:
+        docs_res = supabase.table("documents").select("id, filename").in_("id", all_doc_ids).execute()
+        filename_by_doc = {d["id"]: d["filename"] for d in (docs_res.data or [])}
+
+        # Latest note per document: ordered desc by created_at, so the
+        # first row seen for a given document is the latest one.
+        notes_res = (
+            supabase.table("notes")
+            .select("id, source_document_id, created_at")
+            .in_("source_document_id", all_doc_ids)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        for row in notes_res.data or []:
+            doc_id = row["source_document_id"]
+            if doc_id not in latest_note_id_by_doc:
+                latest_note_id_by_doc[doc_id] = row["id"]
 
     concept_out = []
     for c in concepts:
         names = [c["canonical_name"], *aliases_by_concept.get(c["id"], [])]
         mastery = next((mastery_by_topic[n.strip().lower()] for n in names if n.strip().lower() in mastery_by_topic), None)
+        source_documents = [
+            {
+                "document_id": doc_id,
+                "filename": filename_by_doc.get(doc_id, "Untitled document"),
+                "note_id": latest_note_id_by_doc.get(doc_id),
+            }
+            for doc_id in source_doc_ids_by_concept.get(c["id"], [])
+            if doc_id in filename_by_doc
+        ]
         concept_out.append(
-            {"id": c["id"], "canonical_name": c["canonical_name"], "description": c.get("description"), "mastery": mastery}
+            {
+                "id": c["id"],
+                "canonical_name": c["canonical_name"],
+                "description": c.get("description"),
+                "mastery": mastery,
+                "source_documents": source_documents,
+            }
         )
 
     return {"subject_id": subject_id, "concepts": concept_out, "edges": edges}

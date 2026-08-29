@@ -172,6 +172,14 @@ class RevisionReminder(BaseModel):
     topic: str
     due_date: datetime
     reason: str
+    subject_id: Optional[str] = None  # lets the UI show/link the reminder's real subject
+
+
+class DailyActivity(BaseModel):
+    """One cell of the Growth Dashboard's consistency heatmap - a calendar
+    day and how many test attempts were submitted on it."""
+    date: str  # "YYYY-MM-DD"
+    count: int
 
 
 class ProgressSummaryOut(BaseModel):
@@ -180,6 +188,7 @@ class ProgressSummaryOut(BaseModel):
     risk_flags: list[RiskFlag]
     revision_reminders: list[RevisionReminder]
     forecast_next_score: Optional[float] = None
+    activity_heatmap: list[DailyActivity] = Field(default_factory=list)
 
 
 # ---------- Study guide ("important topics" mode) ----------
@@ -230,11 +239,21 @@ class ConceptGraphBuildRequest(BaseModel):
     subject_id: str
 
 
+class ConceptSourceDocumentOut(BaseModel):
+    """A document this concept was actually drawn from during ingestion,
+    surfaced so the Knowledge Graph UI can link a concept to real source
+    material (and its generated notes, if any) instead of nothing."""
+    document_id: str
+    filename: str
+    note_id: Optional[str] = None  # latest generated note for this document, if one exists
+
+
 class ConceptOut(BaseModel):
     id: str
     canonical_name: str
     description: Optional[str] = None
     mastery: Optional[float] = None  # 0-1, joined from topic_mastery by name/alias match; null if never tested
+    source_documents: list[ConceptSourceDocumentOut] = Field(default_factory=list)
 
 
 class ConceptEdgeOut(BaseModel):

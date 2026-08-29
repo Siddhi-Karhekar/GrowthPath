@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
 import Logo from "../components/Logo";
+import JournalCard from "../components/JournalCard";
+import Button from "../components/Button";
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth();
@@ -29,55 +31,51 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm rounded-2xl shadow-sm shadow-teal-500/10 border border-teal-100 dark:border-teal-900/40 p-8">
-        <div className="mb-6">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-background">
+      <JournalCard hoverable={false} className="w-full max-w-sm p-8">
+        <div className="mb-2">
           <Logo />
         </div>
-        <p className="text-sm text-slate-500 mb-6">Your personal study-growth companion.</p>
+        <p className="font-body-md text-on-surface-variant mb-6">Your personal study-growth companion.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
+            <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5">Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              className="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 rounded-t-md font-body-md text-on-surface outline-none"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Password</label>
+            <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5">Password</label>
             <input
               type="password"
               required
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              className="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 rounded-t-md font-body-md text-on-surface outline-none"
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {notice && <p className="text-sm text-emerald-600">{notice}</p>}
+          {error && <p className="text-sm text-error">{error}</p>}
+          {notice && <p className="text-sm text-primary">{notice}</p>}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-lg bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400 disabled:opacity-60 text-white text-sm font-medium py-2.5 shadow-sm shadow-teal-500/25"
-          >
+          <Button type="submit" variant="primary" className="w-full" disabled={submitting}>
             {submitting ? "Please wait..." : mode === "signin" ? "Sign in" : "Create account"}
-          </button>
+          </Button>
         </form>
 
         <button
           onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          className="w-full text-center text-sm text-slate-500 hover:text-teal-600 dark:hover:text-teal-400 mt-4"
+          className="w-full text-center font-label-md text-label-md text-on-surface-variant hover:text-primary mt-5"
         >
           {mode === "signin" ? "New here? Create an account" : "Already have an account? Sign in"}
         </button>
-      </div>
+      </JournalCard>
     </div>
   );
 }

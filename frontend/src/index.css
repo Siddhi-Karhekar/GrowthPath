@@ -1,7 +1,118 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Serene Scholar design system
+   "Digital Slow-Living" - a cozy study-journal aesthetic.
+   Token values and component language are ported from the
+   Stitch-exported design spec (serene_scholar/DESIGN.md).
+   Light-only by design - the source spec has no dark palette,
+   so we don't invent one.
+   ============================================================ */
+@theme {
+  /* --- Color roles --- */
+  --color-surface: #fbf9f5;
+  --color-surface-dim: #dbdad6;
+  --color-surface-bright: #fbf9f5;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f5f3ef;
+  --color-surface-container: #efeeea;
+  --color-surface-container-high: #eae8e4;
+  --color-surface-container-highest: #e4e2de;
+  --color-on-surface: #1b1c1a;
+  --color-on-surface-variant: #3d4947;
+  --color-inverse-surface: #30312e;
+  --color-inverse-on-surface: #f2f0ed;
+  --color-outline: #6d7a77;
+  --color-outline-variant: #bcc9c6;
+  --color-surface-tint: #006a61;
+  --color-primary: #00685f;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #008378;
+  --color-on-primary-container: #f4fffc;
+  --color-inverse-primary: #6bd8cb;
+  --color-secondary: #006686;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #7ed4fd;
+  --color-on-secondary-container: #005b78;
+  --color-tertiary: #6e5e0d;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #bfaa55;
+  --color-on-tertiary-container: #4b3f00;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  --color-primary-fixed: #89f5e7;
+  --color-primary-fixed-dim: #6bd8cb;
+  --color-on-primary-fixed: #00201d;
+  --color-on-primary-fixed-variant: #005049;
+  --color-secondary-fixed: #c0e8ff;
+  --color-secondary-fixed-dim: #7bd1fa;
+  --color-on-secondary-fixed: #001e2b;
+  --color-on-secondary-fixed-variant: #004d66;
+  --color-tertiary-fixed: #f9e287;
+  --color-tertiary-fixed-dim: #dcc66e;
+  --color-on-tertiary-fixed: #221b00;
+  --color-on-tertiary-fixed-variant: #534600;
+  --color-background: #fbf9f5;
+  --color-on-background: #1b1c1a;
+  --color-surface-variant: #e4e2de;
+  --color-ink-charcoal: #1e293b;
+  --color-paper-shadow: #e2e8f0;
+  --color-warm-gray: #78716c;
+
+  /* --- Typography --- */
+  --font-display-hero: "Literata", serif;
+  --font-headline-lg: "Literata", serif;
+  --font-headline-md: "Literata", serif;
+  --font-title-lg: "Hanken Grotesk", sans-serif;
+  --font-body-lg: "Hanken Grotesk", sans-serif;
+  --font-body-md: "Hanken Grotesk", sans-serif;
+  --font-label-md: "Hanken Grotesk", sans-serif;
+  --font-caption: "Hanken Grotesk", sans-serif;
+
+  --text-display-hero: 48px;
+  --text-display-hero--line-height: 56px;
+  --text-display-hero--letter-spacing: -0.02em;
+  --text-display-hero--font-weight: 700;
+  --text-headline-lg: 32px;
+  --text-headline-lg--line-height: 40px;
+  --text-headline-lg--font-weight: 600;
+  --text-headline-md: 24px;
+  --text-headline-md--line-height: 32px;
+  --text-headline-md--font-weight: 600;
+  --text-title-lg: 20px;
+  --text-title-lg--line-height: 28px;
+  --text-title-lg--font-weight: 600;
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 28px;
+  --text-body-md: 16px;
+  --text-body-md--line-height: 24px;
+  --text-label-md: 14px;
+  --text-label-md--line-height: 20px;
+  --text-label-md--letter-spacing: 0.02em;
+  --text-label-md--font-weight: 600;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption--font-weight: 500;
+
+  /* --- Radii (base "journal card" radius is 24px / xl) --- */
+  --radius-sm: 0.25rem;
+  --radius: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  /* --- Named spacing (adds to, doesn't replace, the numeric scale) --- */
+  --spacing-sidebar-width: 280px;
+  --spacing-content-max-width: 1200px;
+  --spacing-gutter: 2rem;
+  --spacing-margin-desktop: 4rem;
+  --spacing-safe-area: 1.5rem;
+}
+
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 /* Bumping the root size scales every Tailwind rem-based utility (padding,
@@ -13,14 +124,13 @@ html {
 
 body {
   margin: 0;
-  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
-  background: linear-gradient(180deg, #f0fdfa 0%, #f0f9ff 100%);
+  background-color: var(--color-background);
+  color: var(--color-on-background);
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    background: linear-gradient(180deg, #0a1f1c 0%, #0b1524 100%);
-  }
+::selection {
+  background: var(--color-secondary-container);
+  color: var(--color-on-secondary-container);
 }
 
 /* A calm, consistent "smooth transition" feel across the app - scoped to
@@ -37,9 +147,69 @@ textarea,
   transition-duration: 180ms;
 }
 
-::selection {
-  background: #99f6e4;
-  color: #134e4a;
+/* ---- Serene Scholar component language ----
+   Ported from the Stitch mockups' <style> blocks. Keep these as plain CSS
+   (rather than long Tailwind utility chains) since they're reused as a
+   single class across many components. */
+
+.journal-card {
+  background-color: var(--color-surface-container-lowest);
+  border-radius: var(--radius-xl);
+  border: 1.5px solid var(--color-warm-gray);
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.journal-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 104, 95, 0.05);
+}
+
+.spring-btn {
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.spring-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 104, 95, 0.15);
+}
+
+/* "Washi Tape" active nav state: a soft sky-blue band with a subtle
+   noise-texture overlay sitting behind the active item. */
+.washi-tape-active {
+  position: relative;
+}
+.washi-tape-active::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: rgba(126, 212, 253, 0.4);
+  border-radius: var(--radius-md);
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.1'/%3E%3C/svg%3E");
+}
+
+/* "Stacked Paper" depth effect - offset borders instead of drop shadows. */
+.stacked-paper {
+  background-color: #ffffff;
+  border: 1.5px solid var(--color-paper-shadow);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    2px 2px 0 0 var(--color-surface-container-low),
+    4px 4px 0 0 var(--color-surface-container);
+}
+
+/* Custom scrollbar to match the warm neutral palette. */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-variant);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-outline);
 }
 
 /* "Download as PDF" on Notes/Study guide: rather than fighting the app
@@ -62,4 +232,13 @@ textarea,
     top: 0;
     width: 100%;
   }
+}
+
+/* Non-hoverable variant of .journal-card - same resting look, no lift/glow
+   on hover. Used inside modals and other contexts where the whole
+   container shouldn't behave like a clickable card. */
+.journal-card.static-card:hover {
+  border-color: var(--color-warm-gray);
+  transform: none;
+  box-shadow: none;
 }

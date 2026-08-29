@@ -17,10 +17,13 @@ export default function App() {
       <ProtectedRoute>
         <BrowserRouter>
           <Routes>
+            {/* Test-taking is intentionally outside the sidebar Layout - a
+                distraction-free, full-bleed focus screen while a test is
+                in progress, matching the "Taking a Test" design. */}
+            <Route path="/tests/:testId/take" element={<TestTakingPage />} />
             <Route element={<Layout />}>
               <Route path="/" element={<DocumentsPage />} />
               <Route path="/tests/new" element={<TestConfigPage />} />
-              <Route path="/tests/:testId/take" element={<TestTakingPage />} />
               <Route path="/attempts/:attemptId/results" element={<ResultsPage />} />
               <Route path="/study-guide/:documentId" element={<StudyGuidePage />} />
               <Route path="/notes/:documentId" element={<NotesPage />} />

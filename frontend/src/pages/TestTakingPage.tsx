@@ -2,12 +2,45 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import type { QuestionOut, TestOut } from "../types/api";
+import JournalCard from "../components/JournalCard";
+import Chip from "../components/Chip";
+import ProgressBar from "../components/ProgressBar";
+import Button from "../components/Button";
 
 interface AnsweredEntry {
   question: QuestionOut;
   response: string;
   time_taken_seconds: number;
 }
+
+function formatMMSS(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+const BackIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <path d="M15 5L8 12L15 19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const ForwardIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <path d="M9 5L16 12L9 19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const ClockIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
+    <path d="M12 7.5V12L15 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const CheckIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" fill="currentColor" />
+    <path d="M7.5 12.5L10.2 15.2L16.5 8.5" stroke="var(--color-on-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 export default function TestTakingPage() {
   const { testId } = useParams<{ testId: string }>();
@@ -34,6 +67,7 @@ export default function TestTakingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [startedAt] = useState(() => Date.now());
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const [sessionScore, setSessionScore] = useState(0);
   const [sessionMax, setSessionMax] = useState(0);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -58,11 +92,19 @@ export default function TestTakingPage() {
       .finally(() => setLoading(false));
   }, [testId]);
 
-  if (loading) return <p className="text-slate-500">Loading test...</p>;
-  if (error) return <p className="text-red-600 text-sm">{error}</p>;
+  // A visible elapsed-time badge in the header - counts up, since there's
+  // no time-limit field anywhere in the data model to count down from.
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) return <p className="text-on-surface-variant font-body-md text-center py-16">Loading test...</p>;
+  if (error) return <p className="text-error text-sm text-center py-16">{error}</p>;
   if (!test) return null;
 
   const response = current ? responses[current.id] ?? "" : "";
+  const elapsedSeconds = Math.max(0, Math.round((nowTick - startedAt) / 1000));
 
   function setResponse(value: string) {
     if (!current) return;
@@ -209,107 +251,155 @@ export default function TestTakingPage() {
     }
   }
 
-  if (submitting) return <p className="text-slate-500">Grading your answers...</p>;
-
-  if (!current) {
-    return <p className="text-slate-500">No more questions.</p>;
-  }
-
   const questionsShown = test.adaptive ? answered.length + 1 : queueIndex + 1;
   const questionsTotal = test.adaptive ? undefined : test.questions.length;
   const canGoBack = !test.adaptive && queueIndex > 0;
+  const percentComplete = questionsTotal ? Math.round(((questionsShown - 1) / questionsTotal) * 100) : 0;
 
   return (
-    <div className="max-w-2xl">
-      <p className="text-xs text-slate-400 mb-2">
-        Question {questionsShown}
-        {questionsTotal ? ` of ${questionsTotal}` : ""} · {current.marks} mark(s) · topic: {current.topic ?? "General"}
-      </p>
-
-      <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-6 shadow-sm shadow-teal-500/5">
-        <p className="text-base text-slate-800 dark:text-slate-100 mb-5 whitespace-pre-wrap">{current.prompt}</p>
-
-        {current.format === "mcq" && current.options ? (
-          <div className="space-y-2">
-            {current.options.map((opt) => (
-              <label
-                key={opt}
-                className={`block cursor-pointer rounded-lg border px-4 py-2.5 text-sm ${
-                  response === opt
-                    ? "border-teal-400 bg-teal-50 dark:bg-teal-950/50"
-                    : "border-slate-200 dark:border-slate-700 hover:border-teal-200"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="mcq"
-                  value={opt}
-                  checked={response === opt}
-                  onChange={() => setResponse(opt)}
-                  className="mr-2 accent-teal-500"
-                />
-                {opt}
-              </label>
-            ))}
-          </div>
-        ) : (
-          <div>
-            <textarea
-              value={response}
-              onChange={(e) => setResponse(e.target.value)}
-              rows={6}
-              placeholder="Write your answer, or upload a photo of a handwritten answer below..."
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
-            />
-            <div className="mt-2 flex items-center gap-3">
-              <label className="text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-500 cursor-pointer">
-                {ocrLoading ? "Reading photo..." : "📷 Upload a photo of a handwritten answer"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  disabled={ocrLoading}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = ""; // allow re-selecting the same file
-                    if (file) void handleHandwrittenUpload(file);
-                  }}
-                  className="hidden"
-                />
-              </label>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              We'll read the text out with OCR and drop it in above - handwriting recognition isn't
-              perfect, so check it over before submitting.
-            </p>
-            {ocrError && <p className="text-xs text-red-600 mt-1">{ocrError}</p>}
-          </div>
-        )}
-
-        {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
-
-        <div className="mt-5 flex items-center gap-3">
-          {canGoBack && (
-            <button
-              onClick={goToPrevious}
-              className="rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-teal-300 text-sm font-medium px-5 py-2.5"
-            >
-              Previous
-            </button>
-          )}
-          <button
-            onClick={goToNext}
-            disabled={!response.trim()}
-            className="rounded-lg bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400 disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 shadow-sm shadow-teal-500/25"
-          >
-            {test.adaptive
-              ? "Next" /* adaptive tests don't know the final length in advance */
-              : queueIndex + 1 >= test.questions.length
-                ? "Submit"
-                : "Next"}
-          </button>
+    <div className="min-h-screen flex flex-col bg-background font-body-md">
+      <header className="w-full flex justify-between items-center px-margin-desktop py-4 sticky top-0 bg-background/90 backdrop-blur-md z-50">
+        <button
+          onClick={() => navigate("/")}
+          className="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-2 group"
+        >
+          <span className="group-hover:-translate-x-1 transition-transform">
+            <BackIcon />
+          </span>
+          <span className="font-label-md text-label-md">Save &amp; Exit</span>
+        </button>
+        <div className="font-title-lg text-title-lg text-primary font-bold">Taking a Test</div>
+        <div className="flex items-center gap-2 text-on-surface-variant bg-surface-container-high px-4 py-2 rounded-full border-[1.5px] border-outline-variant">
+          <ClockIcon />
+          <span className="font-label-md text-label-md font-bold">{formatMMSS(elapsedSeconds)}</span>
         </div>
-      </div>
+      </header>
+
+      <main className="flex-1 flex flex-col items-center justify-center px-safe-area md:px-margin-desktop py-12 max-w-content-max-width mx-auto w-full">
+        {submitting ? (
+          <p className="text-on-surface-variant font-body-lg text-body-lg">Grading your answers...</p>
+        ) : !current ? (
+          <p className="text-on-surface-variant font-body-lg text-body-lg">No more questions.</p>
+        ) : (
+          <>
+            <div className="w-full max-w-3xl mb-8">
+              {questionsTotal ? (
+                <>
+                  <div className="flex justify-between items-center mb-2 font-caption text-caption text-on-surface-variant">
+                    <span>
+                      Question {questionsShown} of {questionsTotal}
+                    </span>
+                    <span>{percentComplete}% Completed</span>
+                  </div>
+                  <ProgressBar value={percentComplete} className="border-[1.5px] border-outline-variant" />
+                </>
+              ) : (
+                <>
+                  <div className="mb-2 font-caption text-caption text-on-surface-variant">Question {questionsShown}</div>
+                  <div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden border-[1.5px] border-outline-variant">
+                    <div className="h-full w-2/5 bg-primary/60 rounded-full animate-pulse" />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <JournalCard hoverable={false} className="w-full max-w-3xl p-8 md:p-12 relative overflow-hidden">
+              <div className="absolute top-0 right-12 w-24 h-4 bg-secondary-container/40 -translate-y-1/2 rotate-2 blur-[1px]" />
+              <div className="space-y-8">
+                <Chip tone="secondary">{current.topic ?? "General"}</Chip>
+
+                <h2 className="font-headline-lg text-headline-lg text-on-background whitespace-pre-wrap">{current.prompt}</h2>
+
+                {current.format === "mcq" && current.options ? (
+                  <div className="grid grid-cols-1 gap-4 mt-8">
+                    {current.options.map((opt) => {
+                      const selected = response === opt;
+                      return (
+                        <label
+                          key={opt}
+                          className={`relative flex items-start p-6 cursor-pointer border-[1.5px] rounded-xl transition-all group ${
+                            selected
+                              ? "border-primary bg-surface-container-low shadow-[0_2px_12px_rgba(0,104,95,0.08)]"
+                              : "border-outline-variant hover:border-primary hover:bg-surface-container-low"
+                          }`}
+                        >
+                          <div className="flex items-center h-6">
+                            <input
+                              type="radio"
+                              name="mcq"
+                              value={opt}
+                              checked={selected}
+                              onChange={() => setResponse(opt)}
+                              className="w-5 h-5 accent-primary"
+                            />
+                          </div>
+                          <div className="ml-4 flex-1">
+                            <span className={`font-body-lg text-body-lg text-on-surface ${selected ? "font-medium" : ""}`}>{opt}</span>
+                          </div>
+                          {selected && <span className="absolute top-1/2 -translate-y-1/2 right-6 text-primary"><CheckIcon /></span>}
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div>
+                    <textarea
+                      value={response}
+                      onChange={(e) => setResponse(e.target.value)}
+                      rows={6}
+                      placeholder="Write your answer, or upload a photo of a handwritten answer below..."
+                      className="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 rounded-t-md font-body-md text-on-surface outline-none"
+                    />
+                    <div className="mt-3 flex items-center gap-3">
+                      <label className="text-label-md font-label-md text-primary hover:opacity-80 cursor-pointer">
+                        {ocrLoading ? "Reading photo..." : "📷 Upload a photo of a handwritten answer"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          disabled={ocrLoading}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = ""; // allow re-selecting the same file
+                            if (file) void handleHandwrittenUpload(file);
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                    <p className="text-caption font-caption text-on-surface-variant mt-1.5">
+                      We'll read the text out with OCR and drop it in above - handwriting recognition isn't
+                      perfect, so check it over before submitting.
+                    </p>
+                    {ocrError && <p className="text-caption font-caption text-error mt-1">{ocrError}</p>}
+                  </div>
+                )}
+
+                {error && <p className="text-sm text-error">{error}</p>}
+              </div>
+            </JournalCard>
+
+            <div className="w-full max-w-3xl mt-12 flex justify-between items-center">
+              {canGoBack ? (
+                <Button variant="secondary" onClick={goToPrevious} className="group">
+                  <span className="group-hover:-translate-x-1 transition-transform">
+                    <BackIcon />
+                  </span>
+                  Previous
+                </Button>
+              ) : (
+                <span />
+              )}
+              <Button variant="primary" onClick={goToNext} disabled={!response.trim()} className="group">
+                {test.adaptive ? "Next" : queueIndex + 1 >= test.questions.length ? "Submit" : "Next Question"}
+                <span className="group-hover:translate-x-1 transition-transform">
+                  <ForwardIcon />
+                </span>
+              </Button>
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }

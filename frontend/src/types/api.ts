@@ -97,6 +97,12 @@ export interface RevisionReminder {
   topic: string;
   due_date: string;
   reason: string;
+  subject_id: string | null;
+}
+
+export interface DailyActivity {
+  date: string; // "YYYY-MM-DD"
+  count: number;
 }
 
 export interface ProgressSummaryOut {
@@ -105,6 +111,7 @@ export interface ProgressSummaryOut {
   risk_flags: RiskFlag[];
   revision_reminders: RevisionReminder[];
   forecast_next_score: number | null;
+  activity_heatmap: DailyActivity[];
 }
 
 export interface StudyGuideTopic {
@@ -137,11 +144,18 @@ export interface NoteOut {
 
 export type RelationType = "prerequisite" | "related" | "part_of" | "contrasts_with";
 
+export interface ConceptSourceDocument {
+  document_id: string;
+  filename: string;
+  note_id: string | null;
+}
+
 export interface ConceptOut {
   id: string;
   canonical_name: string;
   description: string | null;
   mastery: number | null;
+  source_documents: ConceptSourceDocument[];
 }
 
 export interface ConceptEdgeOut {

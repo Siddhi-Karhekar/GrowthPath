@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import type { StudyGuideOut } from "../types/api";
+import JournalCard from "../components/JournalCard";
+import Chip from "../components/Chip";
+import ProgressBar from "../components/ProgressBar";
+import Button from "../components/Button";
 
 const formatLabel: Record<string, string> = {
   mcq: "Likely MCQ",
@@ -38,72 +42,55 @@ export default function StudyGuidePage() {
     }
   }
 
-  if (loading) return <p className="text-slate-500">Loading...</p>;
+  if (loading) return <p className="text-on-surface-variant font-body-md">Loading...</p>;
 
   return (
     <div className="max-w-2xl">
-      <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Study guide</h1>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="font-headline-lg text-headline-lg text-on-background">Study guide</h2>
         {guide && (
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => window.print()}
-              className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-medium"
-            >
+          <div className="flex items-center gap-5">
+            <button onClick={() => window.print()} className="font-label-md text-label-md text-on-surface-variant hover:text-primary">
               Download as PDF
             </button>
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="text-sm text-teal-600 hover:text-teal-500 font-medium disabled:opacity-50"
-            >
+            <button onClick={handleGenerate} disabled={generating} className="font-label-md text-label-md text-primary disabled:opacity-50">
               {generating ? "Regenerating..." : "Regenerate"}
             </button>
           </div>
         )}
       </div>
-      <p className="text-sm text-slate-500 mb-1">
+      <p className="font-body-md text-on-surface-variant mb-1">
         Topics ranked by how much of your document covers them, with a predicted format and mark range for each.
       </p>
-      <p className="text-xs text-slate-400 mb-6">
+      <p className="font-caption text-caption text-on-surface-variant mb-6">
         This is an estimate based on how your own material emphasizes each topic - not a leaked or guaranteed exam question.
       </p>
 
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      {error && <p className="text-sm text-error mb-4">{error}</p>}
 
       {!guide ? (
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="rounded-lg bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400 disabled:opacity-60 text-white text-sm font-medium px-5 py-2.5 shadow-sm shadow-teal-500/25"
-        >
+        <Button variant="primary" onClick={handleGenerate} disabled={generating}>
           {generating ? "Analyzing document..." : "Generate study guide"}
-        </button>
+        </Button>
       ) : (
-        <div id="printable-content" className="space-y-3">
-          <h1 className="hidden print:block text-xl font-semibold text-slate-900 mb-1">Study guide</h1>
-          <p className="hidden print:block text-xs text-slate-400 mb-4">
+        <div id="printable-content" className="space-y-4">
+          <h1 className="hidden print:block font-headline-md text-headline-md text-on-background mb-1">Study guide</h1>
+          <p className="hidden print:block font-caption text-caption text-on-surface-variant mb-4">
             GrowthPath study guide - generated {new Date(guide.created_at).toLocaleDateString()}
           </p>
           {guide.topics.map((t) => (
-            <div key={t.topic} className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-4 shadow-sm shadow-teal-500/5">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{t.topic}</span>
-                <span className="text-xs text-slate-400">{Math.round(t.importance * 100)}% of document</span>
+            <JournalCard key={t.topic} hoverable={false} className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-title-lg text-title-lg text-on-background">{t.topic}</span>
+                <span className="font-caption text-caption text-on-surface-variant">{Math.round(t.importance * 100)}% of document</span>
               </div>
-              <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden mb-2.5">
-                <div className="h-full bg-gradient-to-r from-teal-400 to-sky-500 rounded-full" style={{ width: `${Math.round(t.importance * 100)}%` }} />
+              <ProgressBar value={Math.round(t.importance * 100)} className="mb-3" />
+              <div className="flex items-center gap-2 mb-2">
+                <Chip tone="primary">{formatLabel[t.predicted_format] ?? t.predicted_format}</Chip>
+                <Chip tone="neutral">{t.predicted_marks_range} marks</Chip>
               </div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-400">
-                  {formatLabel[t.predicted_format] ?? t.predicted_format}
-                </span>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                  {t.predicted_marks_range} marks
-                </span>
-              </div>
-              <p className="text-sm text-slate-600 dark:text-slate-400">{t.rationale}</p>
-            </div>
+              <p className="font-body-md text-on-surface-variant">{t.rationale}</p>
+            </JournalCard>
           ))}
         </div>
       )}

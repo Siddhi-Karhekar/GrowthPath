@@ -1,13 +1,15 @@
 """
 Builds the "personal growth" dashboard payload: score history over time,
 per-topic mastery with trend, risk flags for weak/declining topics, upcoming
-spaced-repetition revision reminders, and a next-score forecast.
+spaced-repetition revision reminders, a next-score forecast, and a
+day-bucketed activity heatmap of test attempts.
 
 Queries are deliberately done as a few simple round trips rather than one
 clever nested join - easier to reason about and to explain in an interview,
 and avoids relying on postgrest embedded-filter syntax that's easy to get
 subtly wrong.
 """
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 from app.core.supabase_client import get_supabase
@@ -97,6 +99,7 @@ def get_progress_summary(user_id: str, subject_id: str | None = None) -> dict:
             "topic": row["topic"],
             "due_date": row["next_review_at"],
             "reason": f"Spaced-repetition review due (mastery: {round(row['mastery'] * 100)}%)",
+            "subject_id": row.get("subject_id"),
         }
         for row in mastery_rows
         if row.get("next_review_at") and _parse(row["next_review_at"]) <= lookahead
@@ -111,6 +114,7 @@ def get_progress_summary(user_id: str, subject_id: str | None = None) -> dict:
         "risk_flags": risk_flags,
         "revision_reminders": revision_reminders,
         "forecast_next_score": forecast,
+        "activity_heatmap": _build_activity_heatmap(attempts),
     }
 
 
@@ -123,7 +127,16 @@ def _empty_summary() -> dict:
         "risk_flags": [],
         "revision_reminders": [],
         "forecast_next_score": None,
+        "activity_heatmap": [],
     }
+
+
+def _build_activity_heatmap(attempts: list[dict]) -> list[dict]:
+    """Day-bucketed test-attempt counts for the Growth Dashboard's
+    Consistency heatmap. Only reflects test-taking (the only timestamped
+    study action tracked today), grouped by calendar day of `created_at`."""
+    counts = Counter(a["created_at"][:10] for a in attempts if a.get("created_at"))
+    return [{"date": date, "count": count} for date, count in sorted(counts.items())]
 
 
 def _build_topic_series(supabase, attempts: list[dict]) -> dict[str, list[float]]:

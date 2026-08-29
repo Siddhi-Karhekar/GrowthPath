@@ -7,7 +7,7 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-surface text-on-surface-variant text-sm font-body-md">Loading...</div>
     );
   }
   if (!session) return <AuthPage />;

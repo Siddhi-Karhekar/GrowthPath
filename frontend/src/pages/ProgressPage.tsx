@@ -1,42 +1,28 @@
 import { useEffect, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Link } from "react-router-dom";
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../lib/api";
 import type { ProgressSummaryOut, SubjectOut } from "../types/api";
+import JournalCard from "../components/JournalCard";
+import Chip from "../components/Chip";
+import HeatmapCalendar from "../components/HeatmapCalendar";
+import { formatDueBucket } from "../lib/format";
 
-const severityColor: Record<string, string> = {
-  high: "border-red-300 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400",
-  medium: "border-amber-300 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400",
-  low: "border-slate-200 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400",
-};
-
-// Same 0.45 / 0.7 thresholds the backend uses for risk flags (analytics_service.py),
-// so this chart's colors agree with what "Needs attention" means elsewhere on the page.
+// Same 0.45 / 0.7 thresholds the backend uses for risk flags
+// (analytics_service.py) and the Knowledge Graph page uses for node color,
+// reusing the app's semantic error/tertiary/primary roles so every view
+// agrees on what "needs attention" vs. "strong" means.
 function masteryBarColor(masteryPct: number): string {
-  if (masteryPct < 45) return "#fb7185"; // rose-400
-  if (masteryPct < 70) return "#fbbf24"; // amber-400
-  return "#2dd4bf"; // teal-400
+  if (masteryPct < 45) return "#ba1a1a"; // error
+  if (masteryPct < 70) return "#6e5e0d"; // tertiary
+  return "#00685f"; // primary
 }
 
-function isoWeekLabel(dateStr: string): { key: string; label: string } {
-  const d = new Date(dateStr);
-  const monday = new Date(d);
-  const day = (d.getDay() + 6) % 7; // 0 = Monday
-  monday.setDate(d.getDate() - day);
-  const key = monday.toISOString().slice(0, 10);
-  const label = monday.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  return { key, label };
-}
+const severityTone: Record<string, "error" | "tertiary" | "neutral"> = {
+  high: "error",
+  medium: "tertiary",
+  low: "neutral",
+};
 
 export default function ProgressPage() {
   const [summary, setSummary] = useState<ProgressSummaryOut | null>(null);
@@ -53,8 +39,10 @@ export default function ProgressPage() {
     api.getProgress(activeSubject || undefined).then(setSummary).catch((e) => setError((e as Error).message));
   }, [activeSubject]);
 
-  if (error) return <p className="text-red-600 text-sm">{error}</p>;
-  if (!summary) return <p className="text-slate-500">Loading your progress...</p>;
+  if (error) return <p className="text-error text-sm">{error}</p>;
+  if (!summary) return <p className="text-on-surface-variant font-body-md">Loading your progress...</p>;
+
+  const subjectNameById = new Map(subjects.map((s) => [s.id, s.name]));
 
   const chartData = summary.history.map((h) => ({
     date: new Date(h.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
@@ -65,126 +53,160 @@ export default function ProgressPage() {
     .sort((a, b) => a.mastery - b.mastery)
     .map((t) => ({ topic: t.topic, masteryPct: Math.round(t.mastery * 100) }));
 
-  // Study activity: how many tests were taken per week - a lightweight,
-  // already-collected proxy for study consistency, without needing a
-  // separate behavioral-tracking pipeline.
-  const activityBuckets = new Map<string, { label: string; count: number }>();
-  for (const h of summary.history) {
-    const { key, label } = isoWeekLabel(h.date);
-    const existing = activityBuckets.get(key);
-    if (existing) existing.count += 1;
-    else activityBuckets.set(key, { label, count: 1 });
-  }
-  const activityData = [...activityBuckets.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v);
-
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">My Growth</h1>
-          <p className="text-sm text-slate-500">
-            A running picture of how you're doing over time - not a grade, a trajectory.
+          <h2 className="font-headline-lg text-headline-lg text-on-background mb-2">Growth Dashboard</h2>
+          <p className="font-body-lg text-body-lg text-on-surface-variant">
+            Track your learning trajectory and consistency.
           </p>
         </div>
         {subjects.length > 0 && (
           <select
             value={activeSubject}
             onChange={(e) => setActiveSubject(e.target.value)}
-            className="rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            className="bg-surface-container-low border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 rounded-t-md font-body-md text-on-surface outline-none"
           >
             <option value="">All subjects</option>
             {subjects.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
             ))}
           </select>
         )}
       </div>
 
       {summary.history.length === 0 ? (
-        <p className="text-slate-400 text-sm">Take your first test to start seeing progress here.</p>
+        <p className="text-on-surface-variant font-body-md">Take your first test to start seeing progress here.</p>
       ) : (
-        <>
-          <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-5 shadow-sm shadow-teal-500/5">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">Score over time</h2>
-              {summary.forecast_next_score !== null && (
-                <span className="text-xs text-slate-500">
-                  Projected next score: <span className="font-semibold text-teal-600">{summary.forecast_next_score}%</span>
-                </span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 space-y-8">
+            <JournalCard hoverable={false} className="p-8">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-headline-md text-headline-md text-on-background">Knowledge Trajectory</h3>
+                {summary.forecast_next_score !== null && (
+                  <span className="font-caption text-caption text-on-surface-variant">
+                    Projected next: <span className="font-semibold text-primary">{summary.forecast_next_score}%</span>
+                  </span>
+                )}
+              </div>
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e2de" />
+                  <XAxis dataKey="date" fontSize={12} stroke="#3d4947" />
+                  <YAxis domain={[0, 100]} fontSize={12} stroke="#3d4947" />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="percentage" stroke="#00685f" strokeWidth={2.5} dot={{ r: 3, fill: "#00685f" }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </JournalCard>
+
+            {summary.risk_flags.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-title-lg text-title-lg text-on-background mb-1">Needs attention</h3>
+                {summary.risk_flags.map((r) => (
+                  <div key={r.topic} className="flex items-center gap-3">
+                    <Chip tone={severityTone[r.severity] ?? "neutral"}>{r.topic}</Chip>
+                    <span className="font-body-md text-caption text-on-surface-variant">{r.reason}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <JournalCard hoverable={false} className="p-6">
+                <h3 className="font-title-lg text-title-lg text-on-background mb-4">Consistency</h3>
+                <HeatmapCalendar data={summary.activity_heatmap} />
+              </JournalCard>
+
+              {masteryChartData.length > 0 && (
+                <JournalCard hoverable={false} className="p-6">
+                  <h3 className="font-title-lg text-title-lg text-on-background mb-4">Topic Mastery</h3>
+                  <div className="space-y-4">
+                    {masteryChartData.map((t) => (
+                      <div key={t.topic}>
+                        <div className="flex justify-between font-label-md text-label-md mb-1">
+                          <span className="text-on-surface truncate">{t.topic}</span>
+                          <span style={{ color: masteryBarColor(t.masteryPct) }}>{t.masteryPct}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${t.masteryPct}%`, backgroundColor: masteryBarColor(t.masteryPct) }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </JournalCard>
               )}
             </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
-                <XAxis dataKey="date" fontSize={12} />
-                <YAxis domain={[0, 100]} fontSize={12} />
-                <Tooltip />
-                <Line type="monotone" dataKey="percentage" stroke="#14b8a6" strokeWidth={2} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
+
+            {masteryChartData.length > 3 && (
+              <JournalCard hoverable={false} className="p-6">
+                <h3 className="font-title-lg text-title-lg text-on-background mb-4">Mastery by topic</h3>
+                <ResponsiveContainer width="100%" height={Math.max(160, masteryChartData.length * 34)}>
+                  <BarChart data={masteryChartData} layout="vertical" margin={{ left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e4e2de" />
+                    <XAxis type="number" domain={[0, 100]} fontSize={12} stroke="#3d4947" />
+                    <YAxis type="category" dataKey="topic" width={140} fontSize={12} stroke="#3d4947" />
+                    <Tooltip formatter={(value) => [`${value}%`, "Mastery"]} />
+                    <Bar dataKey="masteryPct" radius={[0, 4, 4, 0]}>
+                      {masteryChartData.map((entry, i) => (
+                        <Cell key={i} fill={masteryBarColor(entry.masteryPct)} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </JournalCard>
+            )}
           </div>
 
-          {activityData.length > 1 && (
-            <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-5 shadow-sm shadow-teal-500/5">
-              <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Study activity (tests per week)</h2>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={activityData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
-                  <XAxis dataKey="label" fontSize={12} />
-                  <YAxis allowDecimals={false} fontSize={12} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#38bdf8" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {summary.risk_flags.length > 0 && (
-            <div>
-              <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Needs attention</h2>
-              <div className="space-y-2">
-                {summary.risk_flags.map((r) => (
-                  <div key={r.topic} className={`rounded-xl border px-4 py-2.5 text-sm ${severityColor[r.severity]}`}>
-                    <span className="font-medium">{r.topic}</span> - {r.reason}
-                  </div>
-                ))}
+          <div className="lg:col-span-4 space-y-6">
+            <JournalCard hoverable={false} className="p-6 sticky top-10">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-outline-variant/50">
+                <span className="text-tertiary">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M6 3.5H15L19 7.5V19.5C19 20.05 18.55 20.5 18 20.5H6C5.45 20.5 5 20.05 5 19.5V4.5C5 3.95 5.45 3.5 6 3.5Z" stroke="currentColor" strokeWidth="1.6" />
+                    <path d="M9 11.5H15M9 15H13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <h3 className="font-title-lg text-title-lg text-on-background">Revision Queue</h3>
               </div>
-            </div>
-          )}
 
-          {masteryChartData.length > 0 && (
-            <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-5 shadow-sm shadow-teal-500/5">
-              <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Mastery by topic</h2>
-              <ResponsiveContainer width="100%" height={Math.max(160, masteryChartData.length * 34)}>
-                <BarChart data={masteryChartData} layout="vertical" margin={{ left: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-slate-200 dark:stroke-slate-800" />
-                  <XAxis type="number" domain={[0, 100]} fontSize={12} />
-                  <YAxis type="category" dataKey="topic" width={140} fontSize={12} />
-                  <Tooltip formatter={(value) => [`${value}%`, "Mastery"]} />
-                  <Bar dataKey="masteryPct" radius={[0, 4, 4, 0]}>
-                    {masteryChartData.map((entry, i) => (
-                      <Cell key={i} fill={masteryBarColor(entry.masteryPct)} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {summary.revision_reminders.length > 0 && (
-            <div>
-              <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Upcoming revision</h2>
-              <div className="space-y-2">
-                {summary.revision_reminders.map((r) => (
-                  <div key={r.topic} className="flex justify-between bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-xl px-4 py-2.5 text-sm">
-                    <span className="text-slate-700 dark:text-slate-300">{r.topic}</span>
-                    <span className="text-slate-400">{new Date(r.due_date).toLocaleDateString()}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+              {summary.revision_reminders.length === 0 ? (
+                <p className="font-body-md text-caption text-on-surface-variant">Nothing due for review right now.</p>
+              ) : (
+                <div className="space-y-4">
+                  {summary.revision_reminders.map((r) => {
+                    const bucket = formatDueBucket(r.due_date);
+                    const subjectName = r.subject_id ? subjectNameById.get(r.subject_id) : null;
+                    const href = r.subject_id
+                      ? `/tests/new?subject=${r.subject_id}&topic=${encodeURIComponent(r.topic)}`
+                      : `/tests/new?topic=${encodeURIComponent(r.topic)}`;
+                    return (
+                      <Link
+                        key={`${r.topic}-${r.due_date}`}
+                        to={href}
+                        className="block p-4 rounded-xl bg-surface hover:bg-surface-container-low transition-colors border border-transparent hover:border-outline-variant/50"
+                      >
+                        <div className="flex justify-between items-start mb-2 gap-2">
+                          {subjectName ? <Chip tone="secondary">{subjectName}</Chip> : <span />}
+                          <span className={`font-caption text-caption shrink-0 ${bucket.overdue ? "text-error" : "text-on-surface-variant"}`}>
+                            {bucket.label}
+                          </span>
+                        </div>
+                        <h4 className="font-body-md font-semibold text-on-background">{r.topic}</h4>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </JournalCard>
+          </div>
+        </div>
       )}
     </div>
   );

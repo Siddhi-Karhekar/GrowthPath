@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import type { DocumentOut, QuestionFormat } from "../types/api";
+import JournalCard from "../components/JournalCard";
+import Button from "../components/Button";
 
 export default function TestConfigPage() {
   const [params] = useSearchParams();
@@ -57,29 +59,33 @@ export default function TestConfigPage() {
     }
   }
 
+  const formatLabels: Record<QuestionFormat, string> = { mcq: "MCQ", theory: "Theory", mixed: "Mixed" };
+
   return (
     <div className="max-w-lg">
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Create a test</h1>
-      <p className="text-sm text-slate-500 mb-6">
+      <h2 className="font-headline-lg text-headline-lg text-on-background mb-2">Create a test</h2>
+      <p className="font-body-md text-on-surface-variant mb-6">
         {topicParam ? `Configure a practice test focused on "${topicParam}".` : "Configure how you want to be tested on this document."}
       </p>
 
-      <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm border border-teal-100 dark:border-teal-900/40 rounded-2xl p-6 space-y-5 shadow-sm shadow-teal-500/5">
+      <JournalCard hoverable={false} className="p-6 space-y-6">
         {subjectParam && !documentParam && (
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Document</label>
+            <label className="block font-label-md text-label-md text-on-surface-variant mb-2">Document</label>
             {loadingDocuments ? (
-              <p className="text-sm text-slate-400">Loading documents...</p>
+              <p className="font-body-md text-caption text-on-surface-variant">Loading documents...</p>
             ) : subjectDocuments.length === 0 ? (
-              <p className="text-sm text-slate-400">No ready documents in this subject yet.</p>
+              <p className="font-body-md text-caption text-on-surface-variant">No ready documents in this subject yet.</p>
             ) : (
               <select
                 value={documentId}
                 onChange={(e) => setDocumentId(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                className="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 rounded-t-md font-body-md text-on-surface outline-none"
               >
                 {subjectDocuments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.filename}</option>
+                  <option key={d.id} value={d.id}>
+                    {d.filename}
+                  </option>
                 ))}
               </select>
             )}
@@ -87,28 +93,26 @@ export default function TestConfigPage() {
         )}
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Question format</label>
+          <label className="block font-label-md text-label-md text-on-surface-variant mb-2">Question format</label>
           <div className="flex gap-2">
             {(["mcq", "theory", "mixed"] as QuestionFormat[]).map((f) => (
               <button
                 key={f}
                 onClick={() => setFormat(f)}
-                className={`px-3 py-1.5 rounded-lg text-sm border ${
+                className={`flex-1 rounded-full py-2 text-label-md font-label-md transition-colors border-2 ${
                   format === f
-                    ? "bg-gradient-to-r from-teal-500 to-sky-500 border-transparent text-white shadow-sm shadow-teal-500/25"
-                    : "border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-teal-300"
+                    ? "bg-primary border-primary text-on-primary"
+                    : "border-outline-variant text-on-surface-variant hover:border-primary"
                 }`}
               >
-                {f === "mcq" ? "MCQ" : f === "theory" ? "Theory" : "Mixed"}
+                {formatLabels[f]}
               </button>
             ))}
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Total marks: {totalMarks}
-          </label>
+          <label className="block font-label-md text-label-md text-on-surface-variant mb-2">Total marks: {totalMarks}</label>
           <input
             type="range"
             min={10}
@@ -116,9 +120,9 @@ export default function TestConfigPage() {
             step={5}
             value={totalMarks}
             onChange={(e) => setTotalMarks(Number(e.target.value))}
-            className="w-full"
+            className="w-full accent-primary"
           />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
+          <div className="flex justify-between font-caption text-caption text-on-surface-variant mt-1">
             <span>10</span>
             <span>40</span>
             <span>80</span>
@@ -127,33 +131,27 @@ export default function TestConfigPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Focus topic (optional)
-          </label>
+          <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5">Focus topic (optional)</label>
           <input
             type="text"
             value={topicFocus}
             onChange={(e) => setTopicFocus(e.target.value)}
-            placeholder="e.g. a weak area from your progress page"
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            placeholder="e.g. a weak area from your growth dashboard"
+            className="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 rounded-t-md font-body-md text-on-surface outline-none placeholder-on-surface-variant/60"
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-          <input type="checkbox" checked={adaptive} onChange={(e) => setAdaptive(e.target.checked)} className="accent-teal-500" />
+        <label className="flex items-center gap-2.5 font-body-md text-on-surface-variant cursor-pointer">
+          <input type="checkbox" checked={adaptive} onChange={(e) => setAdaptive(e.target.checked)} className="w-4 h-4 accent-primary" />
           Adaptive difficulty (questions adjust to how you're doing, live)
         </label>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-error">{error}</p>}
 
-        <button
-          onClick={handleGenerate}
-          disabled={generating || !documentId}
-          className="w-full rounded-lg bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400 disabled:opacity-60 text-white text-sm font-medium py-2.5 shadow-sm shadow-teal-500/25"
-        >
+        <Button variant="primary" className="w-full" onClick={handleGenerate} disabled={generating || !documentId}>
           {generating ? "Generating test..." : "Generate test"}
-        </button>
-      </div>
+        </Button>
+      </JournalCard>
     </div>
   );
 }
