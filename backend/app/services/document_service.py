@@ -203,3 +203,35 @@ def _process_document(user_id: str, document_id: str, full_text: str, page_count
     # Batch insert to keep round trips low.
     for i in range(0, len(rows), 100):
         supabase.table("document_chunks").insert(rows[i : i + 100]).execute()
+
+
+def delete_document(user_id: str, document_id: str) -> None:
+    """Permanently delete a document: removes the stored file and the DB
+    row. Deleting the row cascades (see docs/migration_001/002 + schema.sql)
+    to document_chunks, tests -> questions, tests -> attempts -> answers,
+    and study_guides - all test/attempt/score history generated from this
+    document is lost too. notes and concept_aliases reference this document
+    with ON DELETE SET NULL, so any generated notes are kept (just
+    unlinked), not deleted."""
+    settings = get_settings()
+    supabase = get_supabase()
+
+    existing = (
+        supabase.table("documents")
+        .select("id, storage_path")
+        .eq("id", document_id)
+        .eq("user_id", user_id)
+        .single()
+        .execute()
+    )
+    if not existing.data:
+        raise ValueError("Document not found")
+
+    storage_path = existing.data.get("storage_path")
+    if storage_path:
+        try:
+            supabase.storage.from_(settings.documents_bucket).remove([storage_path])
+        except Exception as exc:  # noqa: BLE001 - don't block the DB delete on a storage hiccup
+            print(f"[document delete] storage remove failed for {storage_path}: {exc}")
+
+    supabase.table("documents").delete().eq("id", document_id).eq("user_id", user_id).execute()

@@ -4,6 +4,8 @@ import { api } from "../lib/api";
 import type { DocumentOut, SubjectOut } from "../types/api";
 import JournalCard from "../components/JournalCard";
 import Chip from "../components/Chip";
+import Modal from "../components/Modal";
+import Button from "../components/Button";
 import { formatRelativeTime } from "../lib/format";
 
 const UNCATEGORIZED = "__uncategorized__";
@@ -66,6 +68,8 @@ export default function DocumentsPage() {
   const [showNewSubject, setShowNewSubject] = useState(false);
   const [query, setQuery] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [docToDelete, setDocToDelete] = useState<DocumentOut | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const reuploadRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   async function refreshSubjects() {
@@ -124,6 +128,21 @@ export default function DocumentsPage() {
       await refreshDocuments();
     } catch (e) {
       setError((e as Error).message);
+    }
+  }
+
+  async function handleDelete() {
+    if (!docToDelete) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await api.deleteDocument(docToDelete.id);
+      setDocToDelete(null);
+      await refreshDocuments();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -270,6 +289,15 @@ export default function DocumentsPage() {
                         >
                           Replace
                         </button>
+                        <button
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            setDocToDelete(doc);
+                          }}
+                          className="block w-full text-left px-3 py-2 rounded-md text-label-md font-label-md text-error hover:bg-error-container"
+                        >
+                          Delete
+                        </button>
                       </div>
                     )}
                     <input
@@ -288,6 +316,26 @@ export default function DocumentsPage() {
           ))}
         </div>
       )}
+
+      <Modal isOpen={!!docToDelete} onClose={() => !deleting && setDocToDelete(null)} title="Delete this document?">
+        <p className="font-body-md text-body-md text-on-surface-variant mb-2">
+          {"This permanently deletes "}
+          <span className="font-semibold text-on-surface">{docToDelete?.filename}</span>
+          {" and cannot be undone."}
+        </p>
+        <p className="font-body-md text-body-md text-error mb-6">
+          Every test, attempt, and score generated from this document will be permanently deleted too. Any notes
+          you generated from it will be kept, just unlinked from this file.
+        </p>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={() => setDocToDelete(null)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button onClick={handleDelete} disabled={deleting} className="!bg-error !text-on-error">
+            {deleting ? "Deleting..." : "Delete permanently"}
+          </Button>
+        </div>
+      </Modal>
 
     </div>
   );

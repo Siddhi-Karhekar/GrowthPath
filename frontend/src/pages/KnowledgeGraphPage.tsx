@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type WheelEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import type { ConceptCandidateOut, ConceptGraphOut, ConceptOut, RelationType, SubjectOut } from "../types/api";
@@ -115,6 +115,13 @@ const relationStyle: Record<RelationType, { dash?: string; color: string; label:
 
 const WIDTH = 780;
 const HEIGHT = 560;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.2;
+
+function clampZoom(z: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+}
 
 export default function KnowledgeGraphPage() {
   const navigate = useNavigate();
@@ -126,6 +133,7 @@ export default function KnowledgeGraphPage() {
   const [error, setError] = useState<string | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
   const [selectedConcept, setSelectedConcept] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     api.listSubjects().then((subs) => {
@@ -140,6 +148,23 @@ export default function KnowledgeGraphPage() {
     api.getConceptGraph(activeSubject).then(setGraph).catch((e) => setError((e as Error).message));
     api.listConceptCandidates(activeSubject).then(setCandidates).catch(() => {});
   }, [activeSubject]);
+
+  useEffect(() => {
+    setZoom(1);
+  }, [activeSubject]);
+
+  function zoomIn() {
+    setZoom((z) => clampZoom(z + ZOOM_STEP));
+  }
+
+  function zoomOut() {
+    setZoom((z) => clampZoom(z - ZOOM_STEP));
+  }
+
+  function handleWheelZoom(e: WheelEvent<SVGSVGElement>) {
+    e.preventDefault();
+    setZoom((z) => clampZoom(z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)));
+  }
 
   async function handleBuild() {
     if (!activeSubject) return;
@@ -269,8 +294,43 @@ export default function KnowledgeGraphPage() {
         </div>
       ) : (
         <div className="flex gap-6 flex-wrap xl:flex-nowrap">
-          <JournalCard hoverable={false} className="p-3 overflow-x-auto min-w-0">
-            <svg width={WIDTH} height={HEIGHT} className="max-w-full">
+          <JournalCard hoverable={false} className="p-3 overflow-x-auto min-w-0 relative">
+            <div className="absolute top-5 right-5 z-10 flex items-center gap-1 journal-card static-card p-1">
+              <button
+                onClick={zoomOut}
+                disabled={zoom <= MIN_ZOOM}
+                aria-label="Zoom out"
+                className="w-7 h-7 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setZoom(1)}
+                aria-label="Reset zoom"
+                className="px-2 h-7 flex items-center justify-center rounded-full text-caption font-caption text-on-surface-variant hover:bg-surface-container-high min-w-[3rem]"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                onClick={zoomIn}
+                disabled={zoom >= MAX_ZOOM}
+                aria-label="Zoom in"
+                className="w-7 h-7 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <svg
+              width={WIDTH}
+              height={HEIGHT}
+              viewBox={`${WIDTH / 2 - WIDTH / zoom / 2} ${HEIGHT / 2 - HEIGHT / zoom / 2} ${WIDTH / zoom} ${HEIGHT / zoom}`}
+              onWheel={handleWheelZoom}
+              className="max-w-full"
+            >
               <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
                   <path d="M0,0 L10,5 L0,10 z" fill="#00685f" />

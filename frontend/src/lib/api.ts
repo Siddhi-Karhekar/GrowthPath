@@ -64,6 +64,8 @@ export const api = {
 
   getDocument: (id: string) => request<DocumentOut>(`/api/documents/${id}`),
 
+  deleteDocument: (id: string) => request<void>(`/api/documents/${id}`, { method: "DELETE" }),
+
   listSubjects: () => request<SubjectOut[]>("/api/subjects"),
 
   createSubject: (name: string) =>

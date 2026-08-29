@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Up
 from app.core.security import get_current_user_id
 from app.core.supabase_client import get_supabase
 from app.models.schemas import DocumentOut, LinkIngestRequest
-from app.services.document_service import ingest_document, ingest_document_from_link, reingest_document
+from app.services.document_service import delete_document, ingest_document, ingest_document_from_link, reingest_document
 
 router = APIRouter()
 
@@ -143,6 +143,14 @@ def list_documents(subject_id: Optional[str] = None, user_id: str = Depends(get_
         query = query.eq("subject_id", subject_id)
     res = query.order("created_at", desc=True).execute()
     return res.data
+
+
+@router.delete("/{document_id}", status_code=204)
+def delete(document_id: str, user_id: str = Depends(get_current_user_id)):
+    try:
+        delete_document(user_id, document_id)
+    except ValueError:
+        raise HTTPException(404, "Document not found")
 
 
 @router.get("/{document_id}", response_model=DocumentOut)
