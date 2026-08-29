@@ -245,41 +245,45 @@ export default function DocumentsPage() {
               <div className="mt-auto pt-4 border-t-[1.5px] border-surface-variant flex justify-between items-center relative">
                 <span className="font-caption text-on-surface-variant">{fileKindLabel(doc)}</span>
 
-                {doc.status === "ready" && (
-                  <>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuId((id) => (id === doc.id ? null : doc.id));
-                      }}
-                      className="text-on-surface-variant hover:text-primary transition-colors"
-                      aria-label="Document actions"
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId((id) => (id === doc.id ? null : doc.id));
+                    }}
+                    className="text-on-surface-variant hover:text-primary transition-colors"
+                    aria-label="Document actions"
+                  >
+                    <KebabIcon />
+                  </button>
+                  {openMenuId === doc.id && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute right-0 bottom-full mb-2 journal-card static-card p-1.5 w-40 z-10 shadow-lg"
                     >
-                      <KebabIcon />
-                    </button>
-                    {openMenuId === doc.id && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute right-0 bottom-full mb-2 journal-card static-card p-1.5 w-40 z-10 shadow-lg"
-                      >
-                        <Link
-                          to={`/tests/new?document=${doc.id}`}
-                          className="block px-3 py-2 rounded-md text-label-md font-label-md text-on-surface hover:bg-surface-container-high"
-                        >
-                          Take a test
-                        </Link>
-                        <Link
-                          to={`/study-guide/${doc.id}`}
-                          className="block px-3 py-2 rounded-md text-label-md font-label-md text-on-surface hover:bg-surface-container-high"
-                        >
-                          Study guide
-                        </Link>
-                        <Link
-                          to={`/notes/${doc.id}`}
-                          className="block px-3 py-2 rounded-md text-label-md font-label-md text-on-surface hover:bg-surface-container-high"
-                        >
-                          Notes
-                        </Link>
+                      {doc.status === "ready" && (
+                        <>
+                          <Link
+                            to={`/tests/new?document=${doc.id}`}
+                            className="block px-3 py-2 rounded-md text-label-md font-label-md text-on-surface hover:bg-surface-container-high"
+                          >
+                            Take a test
+                          </Link>
+                          <Link
+                            to={`/study-guide/${doc.id}`}
+                            className="block px-3 py-2 rounded-md text-label-md font-label-md text-on-surface hover:bg-surface-container-high"
+                          >
+                            Study guide
+                          </Link>
+                          <Link
+                            to={`/notes/${doc.id}`}
+                            className="block px-3 py-2 rounded-md text-label-md font-label-md text-on-surface hover:bg-surface-container-high"
+                          >
+                            Notes
+                          </Link>
+                        </>
+                      )}
+                      {doc.status !== "processing" && (
                         <button
                           onClick={() => {
                             setOpenMenuId(null);
@@ -289,28 +293,28 @@ export default function DocumentsPage() {
                         >
                           Replace
                         </button>
-                        <button
-                          onClick={() => {
-                            setOpenMenuId(null);
-                            setDocToDelete(doc);
-                          }}
-                          className="block w-full text-left px-3 py-2 rounded-md text-label-md font-label-md text-error hover:bg-error-container"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                    <input
-                      ref={(el) => {
-                        reuploadRefs.current[doc.id] = el;
-                      }}
-                      type="file"
-                      accept=".pdf,.docx,.txt"
-                      className="hidden"
-                      onChange={(e) => e.target.files?.[0] && handleReupload(doc.id, e.target.files[0])}
-                    />
-                  </>
-                )}
+                      )}
+                      <button
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          setDocToDelete(doc);
+                        }}
+                        className="block w-full text-left px-3 py-2 rounded-md text-label-md font-label-md text-error hover:bg-error-container"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    ref={(el) => {
+                      reuploadRefs.current[doc.id] = el;
+                    }}
+                    type="file"
+                    accept=".pdf,.docx,.txt"
+                    className="hidden"
+                    onChange={(e) => e.target.files?.[0] && handleReupload(doc.id, e.target.files[0])}
+                  />
+                </>
               </div>
             </JournalCard>
           ))}
