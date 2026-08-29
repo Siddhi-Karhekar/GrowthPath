@@ -5,6 +5,8 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+backend/app/model_assets/
+_scratch_onnx_*
 
 ## Env
 .env
